@@ -33,6 +33,30 @@ import KPI from './pages/KPI';
 import Disciplinary from './pages/Disciplinary';
 import Promotions from './pages/Promotions';
 import Reports from './pages/Reports';
+import SupplierManagement from './features/procurement/pages/SupplierManagement';
+import MaterialRequests from './features/procurement/pages/MaterialRequests';
+import RFQCanvassing from './features/procurement/pages/RFQCanvassing';
+import PurchaseOrders from './features/procurement/pages/PurchaseOrders';
+import ReceivingReports from './features/procurement/pages/ReceivingReports';
+import ItemMasterlist from './features/inventory/pages/ItemMasterlist';
+import StockLevels from './features/inventory/pages/StockLevels';
+import StockMovements from './features/inventory/pages/StockMovements';
+import WarehouseMapping from './features/inventory/pages/WarehouseMapping';
+import InventoryReports from './features/inventory/pages/InventoryReports';
+import DeliveryTracking from './features/logistics/pages/DeliveryTracking';
+import VehicleManagement from './features/logistics/pages/VehicleManagement';
+import LogisticsReports from './features/logistics/pages/LogisticsReports';
+import ClientManagement from './features/sales/pages/ClientManagement';
+import SalesOrders from './features/sales/pages/SalesOrders';
+import SalesReports from './features/sales/pages/SalesReports';
+import ProjectList from './features/projects/pages/ProjectList';
+import ProjectTimesheets from './features/projects/pages/ProjectTimesheets';
+import ProjectBudget from './features/projects/pages/ProjectBudget';
+import ProjectReports from './features/projects/pages/ProjectReports';
+import ChartOfAccounts from './features/accounting/pages/ChartOfAccounts';
+import JournalEntries from './features/accounting/pages/JournalEntries';
+import FinancialStatements from './features/accounting/pages/FinancialStatements';
+import AccountsPayable from './features/accounting/pages/AccountsPayable';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -91,6 +115,30 @@ const AuthenticatedApp = () => {
         <Route path="/reports/leaves" element={<Reports />} />
         <Route path="/reports/payroll" element={<Reports />} />
         <Route path="/reports/attrition" element={<Reports />} />
+        <Route path="/procurement/suppliers" element={<SupplierManagement />} />
+        <Route path="/procurement/material-requests" element={<MaterialRequests />} />
+        <Route path="/procurement/rfq" element={<RFQCanvassing />} />
+        <Route path="/procurement/purchase-orders" element={<PurchaseOrders />} />
+        <Route path="/procurement/receiving-reports" element={<ReceivingReports />} />
+        <Route path="/inventory/items" element={<ItemMasterlist />} />
+        <Route path="/inventory/stock-levels" element={<StockLevels />} />
+        <Route path="/inventory/movements" element={<StockMovements />} />
+        <Route path="/inventory/warehouses" element={<WarehouseMapping />} />
+        <Route path="/inventory/reports" element={<InventoryReports />} />
+        <Route path="/logistics/deliveries" element={<DeliveryTracking />} />
+        <Route path="/logistics/vehicles" element={<VehicleManagement />} />
+        <Route path="/logistics/reports" element={<LogisticsReports />} />
+        <Route path="/sales/clients" element={<ClientManagement />} />
+        <Route path="/sales/orders" element={<SalesOrders />} />
+        <Route path="/sales/reports" element={<SalesReports />} />
+        <Route path="/projects" element={<ProjectList />} />
+        <Route path="/projects/timesheets" element={<ProjectTimesheets />} />
+        <Route path="/projects/budget" element={<ProjectBudget />} />
+        <Route path="/projects/reports" element={<ProjectReports />} />
+        <Route path="/accounting/chart-of-accounts" element={<ChartOfAccounts />} />
+        <Route path="/accounting/journal-entries" element={<JournalEntries />} />
+        <Route path="/accounting/financial-statements" element={<FinancialStatements />} />
+        <Route path="/accounting/accounts-payable" element={<AccountsPayable />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

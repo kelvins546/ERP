@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 import {
   Users, Building2, Briefcase, Clock, DollarSign, BarChart3,
   Star, ChevronDown, ChevronRight, Bell, Menu, X, Home,
-  FileText, Calendar, Award, ClipboardList
+  FileText, Calendar, Award, ClipboardList, ShoppingCart,
+  Package, Truck, TrendingUp, FolderOpen, BookOpen
 } from "lucide-react";
 import { Outlet } from "react-router-dom";
 
@@ -77,6 +78,66 @@ const navItems = [
       { label: "Leave Balance Report", path: "/reports/leaves" },
       { label: "Payroll Summary", path: "/reports/payroll" },
       { label: "Attrition Report", path: "/reports/attrition" },
+    ],
+  },
+  {
+    label: "Procurement",
+    icon: ShoppingCart,
+    children: [
+      { label: "Supplier Management", path: "/procurement/suppliers" },
+      { label: "Material Requests", path: "/procurement/material-requests" },
+      { label: "RFQ & Canvassing", path: "/procurement/rfq" },
+      { label: "Purchase Orders", path: "/procurement/purchase-orders" },
+      { label: "Receiving Reports", path: "/procurement/receiving-reports" },
+    ],
+  },
+  {
+    label: "Inventory",
+    icon: Package,
+    children: [
+      { label: "Item Masterlist", path: "/inventory/items" },
+      { label: "Stock Levels", path: "/inventory/stock-levels" },
+      { label: "Stock Movements", path: "/inventory/movements" },
+      { label: "Warehouse Mapping", path: "/inventory/warehouses" },
+      { label: "Inventory Reports", path: "/inventory/reports" },
+    ],
+  },
+  {
+    label: "Logistics",
+    icon: Truck,
+    children: [
+      { label: "Delivery Tracking", path: "/logistics/deliveries" },
+      { label: "Vehicle Management", path: "/logistics/vehicles" },
+      { label: "Logistics Reports", path: "/logistics/reports" },
+    ],
+  },
+  {
+    label: "Sales",
+    icon: TrendingUp,
+    children: [
+      { label: "Client Management", path: "/sales/clients" },
+      { label: "Sales Orders", path: "/sales/orders" },
+      { label: "Sales Reports", path: "/sales/reports" },
+    ],
+  },
+  {
+    label: "Projects",
+    icon: FolderOpen,
+    children: [
+      { label: "Project List", path: "/projects" },
+      { label: "Timesheets", path: "/projects/timesheets" },
+      { label: "Budget Tracking", path: "/projects/budget" },
+      { label: "Project Reports", path: "/projects/reports" },
+    ],
+  },
+  {
+    label: "Accounting",
+    icon: BookOpen,
+    children: [
+      { label: "Chart of Accounts", path: "/accounting/chart-of-accounts" },
+      { label: "Journal Entries", path: "/accounting/journal-entries" },
+      { label: "Financial Statements", path: "/accounting/financial-statements" },
+      { label: "Accounts Payable", path: "/accounting/accounts-payable" },
     ],
   },
 ];

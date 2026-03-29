@@ -1,0 +1,34 @@
+{
+  "name": "Schedule",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "Schedule Name"
+    },
+    "expected_time_in": {
+      "type": "string",
+      "title": "Expected Time In"
+    },
+    "expected_time_out": {
+      "type": "string",
+      "title": "Expected Time Out"
+    },
+    "grace_period_mins": {
+      "type": "number",
+      "title": "Grace Period (minutes)"
+    },
+    "work_days": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Work Days"
+    }
+  },
+  "required": [
+    "name",
+    "expected_time_in",
+    "expected_time_out"
+  ]
+}

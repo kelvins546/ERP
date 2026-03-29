@@ -1,0 +1,33 @@
+{
+  "name": "Position",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "Position Title"
+    },
+    "salary_grade": {
+      "type": "string",
+      "title": "Salary Grade"
+    },
+    "base_salary_min": {
+      "type": "number",
+      "title": "Min Salary"
+    },
+    "base_salary_max": {
+      "type": "number",
+      "title": "Max Salary"
+    },
+    "department_id": {
+      "type": "string",
+      "title": "Department ID"
+    },
+    "department_name": {
+      "type": "string",
+      "title": "Department"
+    }
+  },
+  "required": [
+    "title"
+  ]
+}

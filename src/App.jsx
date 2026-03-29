@@ -3,6 +3,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
+import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import HRISLayout from './components/HRISLayout';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
@@ -10,10 +12,12 @@ import Departments from './pages/Departments';
 import Positions from './pages/Positions';
 import Announcements from './pages/Announcements';
 import Tasks from './pages/Tasks';
-import OrgChart from './pages/OrgChart';
 import Documents from './pages/Documents';
+import OrgChart from './pages/OrgChart';
 import JobPostings from './pages/JobPostings';
 import Applicants from './pages/Applicants';
+import Interviews from './pages/Interviews';
+import JobOffers from './pages/JobOffers';
 import Attendance from './pages/Attendance';
 import Leaves from './pages/Leaves';
 import Overtime from './pages/Overtime';
@@ -63,10 +67,12 @@ const AuthenticatedApp = () => {
         <Route path="/positions" element={<Positions />} />
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/tasks" element={<Tasks />} />
-        <Route path="/org-chart" element={<OrgChart />} />
         <Route path="/documents" element={<Documents />} />
+        <Route path="/org-chart" element={<OrgChart />} />
         <Route path="/job-postings" element={<JobPostings />} />
         <Route path="/applicants" element={<Applicants />} />
+        <Route path="/interviews" element={<Interviews />} />
+        <Route path="/job-offers" element={<JobOffers />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/leaves" element={<Leaves />} />
         <Route path="/overtime" element={<Overtime />} />
@@ -81,8 +87,10 @@ const AuthenticatedApp = () => {
         <Route path="/kpi" element={<KPI />} />
         <Route path="/disciplinary" element={<Disciplinary />} />
         <Route path="/promotions" element={<Promotions />} />
-        <Route path="/reports/:type" element={<Reports />} />
-        <Route path="/reports" element={<Reports />} />
+        <Route path="/reports/headcount" element={<Reports />} />
+        <Route path="/reports/leaves" element={<Reports />} />
+        <Route path="/reports/payroll" element={<Reports />} />
+        <Route path="/reports/attrition" element={<Reports />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

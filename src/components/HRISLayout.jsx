@@ -2,10 +2,29 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
-  Users, Building2, Briefcase, Clock, DollarSign, BarChart3,
-  Star, ChevronDown, ChevronRight, Bell, Menu, X, Home,
-  FileText, Calendar, Award, ClipboardList, ShoppingCart,
-  Package, Truck, TrendingUp, FolderOpen, BookOpen
+  Users,
+  Building2,
+  Briefcase,
+  Clock,
+  DollarSign,
+  BarChart3,
+  Star,
+  ChevronDown,
+  ChevronRight,
+  Bell,
+  Menu,
+  X,
+  Home,
+  FileText,
+  Calendar,
+  Award,
+  ClipboardList,
+  ShoppingCart,
+  Package,
+  Truck,
+  TrendingUp,
+  FolderOpen,
+  BookOpen,
 } from "lucide-react";
 import { Outlet } from "react-router-dom";
 
@@ -136,7 +155,10 @@ const navItems = [
     children: [
       { label: "Chart of Accounts", path: "/accounting/chart-of-accounts" },
       { label: "Journal Entries", path: "/accounting/journal-entries" },
-      { label: "Financial Statements", path: "/accounting/financial-statements" },
+      {
+        label: "Financial Statements",
+        path: "/accounting/financial-statements",
+      },
       { label: "Accounts Payable", path: "/accounting/accounts-payable" },
     ],
   },
@@ -154,7 +176,9 @@ function NavItem({ item, collapsed }) {
         to={item.path}
         className={cn(
           "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-          active ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700 hover:text-white"
+          active
+            ? "bg-white/20 text-white shadow-sm"
+            : "text-white/80 hover:bg-white/10 hover:text-white",
         )}
       >
         <Icon className="w-5 h-5 shrink-0" />
@@ -163,7 +187,7 @@ function NavItem({ item, collapsed }) {
     );
   }
 
-  const isActive = item.children.some(c => location.pathname === c.path);
+  const isActive = item.children.some((c) => location.pathname === c.path);
 
   return (
     <div>
@@ -171,14 +195,20 @@ function NavItem({ item, collapsed }) {
         onClick={() => setOpen(!open)}
         className={cn(
           "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-          isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-700 hover:text-white"
+          isActive
+            ? "bg-white/15 text-white"
+            : "text-white/80 hover:bg-white/10 hover:text-white",
         )}
       >
         <Icon className="w-5 h-5 shrink-0" />
         {!collapsed && (
           <>
             <span className="flex-1 text-left">{item.label}</span>
-            {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {open ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
           </>
         )}
       </button>
@@ -192,7 +222,9 @@ function NavItem({ item, collapsed }) {
                 to={child.path}
                 className={cn(
                   "block px-3 py-2 rounded-lg text-sm transition-colors",
-                  active ? "bg-blue-600 text-white font-medium" : "text-slate-400 hover:bg-slate-700 hover:text-white"
+                  active
+                    ? "bg-white/20 text-white font-medium shadow-sm"
+                    : "text-white/70 hover:bg-white/10 hover:text-white",
                 )}
               >
                 {child.label}
@@ -213,29 +245,37 @@ export default function HRISLayout() {
     <div className="flex h-screen bg-slate-100">
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
       )}
 
       {/* Sidebar */}
-      <aside className={cn(
-        "fixed lg:static z-50 h-full bg-slate-900 transition-all duration-300 flex flex-col",
-        collapsed ? "w-16" : "w-64",
-        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      )}>
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+      <aside
+        className={cn(
+          "fixed lg:static z-50 h-full bg-[#2E6F40] transition-all duration-300 flex flex-col shadow-xl",
+          collapsed ? "w-16" : "w-64",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        )}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
           {!collapsed && (
             <div>
-              <p className="text-white font-bold text-lg">HRIS</p>
-              <p className="text-slate-400 text-xs">HR Management System</p>
+              <p className="text-white font-bold text-lg">Ark Industries</p>
+              <p className="text-white/70 text-xs">Superadmin</p>
             </div>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden lg:flex text-slate-400 hover:text-white p-1 rounded"
+            className="hidden lg:flex text-white/70 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <button onClick={() => setMobileOpen(false)} className="lg:hidden text-slate-400 hover:text-white p-1">
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="lg:hidden text-white/70 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -251,13 +291,16 @@ export default function HRISLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
         <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setMobileOpen(true)} className="lg:hidden text-slate-600">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="lg:hidden text-slate-600"
+          >
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-3 ml-auto">
             <button className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#2E6F40] rounded-full"></span>
             </button>
           </div>
         </header>

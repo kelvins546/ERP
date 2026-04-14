@@ -83,7 +83,11 @@ function PostingModal({ posting, onClose, onSaved }) {
             <Input
               className="mt-1"
               value={form.title}
-              onChange={(e) => set("title", e.target.value)}
+              onChange={(e) => {
+                if (/^[a-zA-Z\s]*$/.test(e.target.value)) {
+                  set("title", e.target.value);
+                }
+              }}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -94,7 +98,11 @@ function PostingModal({ posting, onClose, onSaved }) {
               <Input
                 className="mt-1"
                 value={form.department_name || ""}
-                onChange={(e) => set("department_name", e.target.value)}
+                onChange={(e) => {
+                  if (/^[a-zA-Z\s]*$/.test(e.target.value)) {
+                    set("department_name", e.target.value);
+                  }
+                }}
               />
             </div>
             <div>
@@ -118,8 +126,12 @@ function PostingModal({ posting, onClose, onSaved }) {
             <Input
               className="mt-1"
               value={form.salary_range || ""}
-              onChange={(e) => set("salary_range", e.target.value)}
-              placeholder="e.g. ₱25,000 – ₱35,000"
+              onChange={(e) => {
+                if (/^[0-9]*$/.test(e.target.value)) {
+                  set("salary_range", e.target.value);
+                }
+              }}
+              placeholder="e.g. 25000"
             />
           </div>
           <div>
@@ -130,7 +142,11 @@ function PostingModal({ posting, onClose, onSaved }) {
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
               rows={4}
               value={form.description || ""}
-              onChange={(e) => set("description", e.target.value)}
+              onChange={(e) => {
+                if (/^[a-zA-Z0-9\s]*$/.test(e.target.value)) {
+                  set("description", e.target.value);
+                }
+              }}
             />
           </div>
           <div>
@@ -141,7 +157,11 @@ function PostingModal({ posting, onClose, onSaved }) {
               className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
               rows={3}
               value={form.requirements || ""}
-              onChange={(e) => set("requirements", e.target.value)}
+              onChange={(e) => {
+                if (/^[a-zA-Z0-9\s]*$/.test(e.target.value)) {
+                  set("requirements", e.target.value);
+                }
+              }}
             />
           </div>
           <div>

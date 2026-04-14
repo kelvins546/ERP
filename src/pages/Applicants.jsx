@@ -17,17 +17,32 @@ const stageColors = {
 
 // --- THE MODAL (CREATE & UPDATE) ---
 function ApplicantModal({ applicant, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    job_posting_title: "",
-    status: "applied",
-    source: "",
-    notes: "",
-    job_posting_id: null, // Important for the Foreign Key
-    ...applicant,
+  const [form, setForm] = useState(() => {
+    let phonePrefix = "+63";
+    let phoneNum = applicant?.phone || "";
+
+    // Extract country code prefix from existing phone string if present
+    if (phoneNum.startsWith("+")) {
+      const match = phoneNum.match(/^(\+\d{1,4})(.*)$/);
+      if (match) {
+        phonePrefix = match[1];
+        phoneNum = match[2];
+      }
+    }
+
+    return {
+      first_name: "",
+      last_name: "",
+      email: "",
+      job_posting_title: "",
+      status: "applied",
+      source: "",
+      notes: "",
+      job_posting_id: null, // Important for the Foreign Key
+      ...applicant,
+      phone_prefix: phonePrefix,
+      phone: phoneNum,
+    };
   });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -43,8 +58,8 @@ function ApplicantModal({ applicant, onClose, onSaved }) {
         status: form.status,
         job_posting_id: form.job_posting_id || null,
         // We are passing these anyway. Supabase might ignore them if columns don't exist.
-        // email: form.email,
-        // phone: form.phone,
+        email: form.email,
+        phone: form.phone ? `${form.phone_prefix}${form.phone}` : null,
       };
 
       if (applicant?.id) {
@@ -88,7 +103,12 @@ function ApplicantModal({ applicant, onClose, onSaved }) {
               <Input
                 className="mt-1"
                 value={form.first_name}
-                onChange={(e) => set("first_name", e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (/^[a-zA-Z\s]*$/.test(val) && !/\s\s/.test(val)) {
+                    set("first_name", val);
+                  }
+                }}
               />
             </div>
             <div>
@@ -98,7 +118,12 @@ function ApplicantModal({ applicant, onClose, onSaved }) {
               <Input
                 className="mt-1"
                 value={form.last_name}
-                onChange={(e) => set("last_name", e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (/^[a-zA-Z\s]*$/.test(val) && !/\s\s/.test(val)) {
+                    set("last_name", val);
+                  }
+                }}
               />
             </div>
           </div>
@@ -110,18 +135,48 @@ function ApplicantModal({ applicant, onClose, onSaved }) {
               className="mt-1"
               type="email"
               value={form.email || ""}
-              onChange={(e) => set("email", e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                // No spaces, max one @, no consecutive special chars
+                if (
+                  !/\s/.test(val) &&
+                  (val.match(/@/g) || []).length <= 1 &&
+                  !/[^a-zA-Z0-9]{2,}/.test(val)
+                ) {
+                  set("email", val);
+                }
+              }}
             />
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600">
               Phone (Requires DB Column)
             </label>
-            <Input
-              className="mt-1"
-              value={form.phone || ""}
-              onChange={(e) => set("phone", e.target.value)}
-            />
+            <div className="flex gap-2 mt-1">
+              <select
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-24 shrink-0"
+                value={form.phone_prefix}
+                onChange={(e) => set("phone_prefix", e.target.value)}
+              >
+                <option value="+63">+63 (PH)</option>
+                <option value="+1">+1 (US/CA)</option>
+                <option value="+44">+44 (UK)</option>
+                <option value="+61">+61 (AU)</option>
+                <option value="+81">+81 (JP)</option>
+                <option value="+86">+86 (CN)</option>
+                <option value="+65">+65 (SG)</option>
+              </select>
+              <Input
+                className="flex-1"
+                value={form.phone || ""}
+                onChange={(e) => {
+                  if (/^\d{0,10}$/.test(e.target.value)) {
+                    set("phone", e.target.value);
+                  }
+                }}
+                placeholder="e.g. 9123456789"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

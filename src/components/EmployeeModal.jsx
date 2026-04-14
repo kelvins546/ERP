@@ -16,6 +16,23 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const handleInputChange = (key, value) => {
+    if (["first_name", "last_name", "middle_name", "emergency_contact_name"].includes(key)) {
+      // Letters, spaces, periods, and hyphens only (includes ñ/Ñ)
+      if (!/^[a-zA-Z\sñÑ.\-]*$/.test(value)) return;
+    } else if (["phone", "emergency_contact_phone"].includes(key)) {
+      // Phone numbers: allow digits, plus, hyphens, spaces, parentheses
+      if (!/^[0-9+\-\s()]*$/.test(value)) return;
+    } else if (["sss_number", "philhealth_number", "pagibig_number", "tin_number"].includes(key)) {
+      // Government IDs: Numbers and hyphens only
+      if (!/^[0-9\-]*$/.test(value)) return;
+    } else if (key === "employee_code") {
+      // Employee codes: Alphanumeric and hyphens only
+      if (!/^[a-zA-Z0-9\-]*$/.test(value)) return;
+    }
+    set(key, value);
+  };
+
   const save = async () => {
     setSaving(true);
     if (employee?.id) {
@@ -57,7 +74,7 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
             {fields.map(f => (
               <div key={f.key}>
                 <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}{f.required && " *"}</label>
-                <Input type={f.type || "text"} value={form[f.key] || ""} onChange={e => set(f.key, e.target.value)} placeholder={f.label} />
+                <Input type={f.type || "text"} value={form[f.key] || ""} onChange={e => handleInputChange(f.key, e.target.value)} placeholder={f.label} />
               </div>
             ))}
             <div>

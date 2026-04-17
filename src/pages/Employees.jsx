@@ -3,17 +3,27 @@ import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
 import {
   Plus,
   Search,
-  Filter,
   Edit,
-  Eye,
   Trash2,
-  UserCheck,
-  UserX,
+  Building2,
+  MapPin,
+  Briefcase,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import EmployeeModal from "@/components/EmployeeModal";
+import EmployeeAssignmentModal from "@/components/EmployeeAssignmentModal";
 const statusColors = {
   regular: "bg-green-100 text-green-700",
   probationary: "bg-yellow-100 text-yellow-700",
@@ -22,34 +32,106 @@ const statusColors = {
   terminated: "bg-red-100 text-red-700",
 };
 
+const POSITION_LINK_TABLE_CANDIDATES = [
+  "employee_positions",
+  "employee_position_assignments",
+];
+
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
+  const [departmentsById, setDepartmentsById] = useState({});
+  const [projectSitesById, setProjectSitesById] = useState({});
+  const [positionsById, setPositionsById] = useState({});
+  const [employeePositionMap, setEmployeePositionMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editEmployee, setEditEmployee] = useState(null);
+  const [assignmentAction, setAssignmentAction] = useState(null);
+  const [assignmentEmployee, setAssignmentEmployee] = useState(null);
+  const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     try {
       setLoading(true);
-      // Supabase Read: We use a "join" to fetch the actual names of the department and position instead of just their UUIDs
-      const { data, error } = await supabase
-        .from("employees")
-        .select(
-          `
-          *,
-          departments ( name ),
-          positions ( title )
-        `,
-        )
-        .order("created_at", { ascending: false })
-        .limit(200);
+      setLoadError("");
 
-      if (error) throw error;
-      setEmployees(data || []);
+      const [employeesResult, departmentsResult, projectSitesResult, positionsResult] =
+        await Promise.all([
+          supabase
+            .from("employees")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(200),
+          supabase.from("departments").select("id, name"),
+          supabase.from("project_sites").select("id, name, location"),
+          supabase.from("positions").select("id, title"),
+        ]);
+
+      if (employeesResult.error) throw employeesResult.error;
+      if (departmentsResult.error) throw departmentsResult.error;
+      if (projectSitesResult.error) throw projectSitesResult.error;
+      if (positionsResult.error) throw positionsResult.error;
+
+      const deptMap = (departmentsResult.data || []).reduce((acc, dept) => {
+        acc[dept.id] = dept;
+        return acc;
+      }, {});
+      const posMap = (positionsResult.data || []).reduce((acc, pos) => {
+        acc[pos.id] = pos;
+        return acc;
+      }, {});
+      const siteMap = (projectSitesResult.data || []).reduce((acc, site) => {
+        acc[site.id] = site;
+        return acc;
+      }, {});
+
+      setEmployees(employeesResult.data || []);
+      setDepartmentsById(deptMap);
+      setProjectSitesById(siteMap);
+      setPositionsById(posMap);
+
+      let positionLinkTable = null;
+      for (const tableName of POSITION_LINK_TABLE_CANDIDATES) {
+        const probe = await supabase
+          .from(tableName)
+          .select("employee_id, position_id")
+          .limit(1);
+        if (!probe.error) {
+          positionLinkTable = tableName;
+          break;
+        }
+      }
+
+      if (positionLinkTable && (employeesResult.data || []).length > 0) {
+        const employeeIds = (employeesResult.data || []).map((row) => row.id);
+        const assignmentsResult = await supabase
+          .from(positionLinkTable)
+          .select("employee_id, position_id")
+          .in("employee_id", employeeIds);
+
+        if (!assignmentsResult.error) {
+          const grouped = (assignmentsResult.data || []).reduce((acc, row) => {
+            const employeeId = String(row.employee_id);
+            const title = posMap[row.position_id]?.title;
+            if (!title) return acc;
+            if (!acc[employeeId]) acc[employeeId] = [];
+            if (!acc[employeeId].includes(title)) acc[employeeId].push(title);
+            return acc;
+          }, {});
+          setEmployeePositionMap(grouped);
+        } else {
+          setEmployeePositionMap({});
+        }
+      } else {
+        setEmployeePositionMap({});
+      }
     } catch (error) {
       console.error("Error loading employees:", error.message);
+      setLoadError(error.message || "Failed to load employees.");
     } finally {
       setLoading(false);
     }
@@ -69,22 +151,21 @@ export default function Employees() {
     return matchSearch && matchStatus;
   });
 
-  const handleDelete = async (id) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this employee? This cannot be undone.",
-      )
-    )
-      return;
+  const handleDelete = async () => {
+    if (!deleteCandidate?.id) return;
+
     try {
-      // Supabase Delete
-      const { error } = await supabase.from("employees").delete().eq("id", id);
+      setDeleting(true);
+      const { error } = await supabase
+        .from("employees")
+        .delete()
+        .eq("id", deleteCandidate.id);
       if (error) throw error;
-      load(); // Refresh list
+      setDeleteCandidate(null);
+      load();
     } catch (error) {
       console.error("Delete failed:", error.message);
 
-      // Foreign key constraint warning
       if (error.code === "23503") {
         alert(
           "Cannot delete this employee because they are referenced in other records (e.g., Attendance, Payroll, or as a Department Head).",
@@ -92,7 +173,23 @@ export default function Employees() {
       } else {
         alert("Failed to delete employee.");
       }
+    } finally {
+      setDeleting(false);
     }
+  };
+
+  const openAssignment = (action, employee) => {
+    setAssignmentAction(action);
+    setAssignmentEmployee(employee);
+  };
+
+  const getPositionTitles = (emp) => {
+    const multiple = employeePositionMap[String(emp.id)] || [];
+    if (multiple.length > 0) return multiple;
+
+    const singleTitle =
+      positionsById[emp.position_id]?.title || emp.position_name || null;
+    return singleTitle ? [singleTitle] : [];
   };
 
   return (
@@ -144,6 +241,11 @@ export default function Employees() {
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {loadError && (
+          <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            Error loading employees: {loadError}
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
@@ -161,6 +263,7 @@ export default function Employees() {
                     "Code",
                     "Name",
                     "Department",
+                    "Project Site",
                     "Position",
                     "Status",
                     "Hire Date",
@@ -204,12 +307,23 @@ export default function Employees() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">
-                      {/* Using the joined data from Supabase */}
-                      {emp.departments?.name || "—"}
+                      {departmentsById[emp.department_id]?.name ||
+                        emp.department_name ||
+                        "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">
-                      {/* Using the joined data from Supabase */}
-                      {emp.positions?.title || "—"}
+                      {projectSitesById[emp.project_site_id]?.name ||
+                        emp.project_site_name ||
+                        "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {getPositionTitles(emp).length > 0 ? (
+                        <span className="text-sm text-slate-700">
+                          {getPositionTitles(emp).join(", ")}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -224,7 +338,36 @@ export default function Employees() {
                         : "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => openAssignment("position", emp)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Assign Position"
+                        >
+                          <Briefcase className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openAssignment("department", emp)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Assign Department"
+                        >
+                          <Building2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openAssignment("projectSite", emp)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Assign Project Site"
+                        >
+                          <MapPin className="w-4 h-4" />
+                        </button>
+                        
+                        <button
+                          onClick={() => openAssignment("status", emp)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Assign Employment Status"
+                        >
+                          <UserCog className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => {
                             setEditEmployee(emp);
@@ -236,7 +379,7 @@ export default function Employees() {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(emp.id)}
+                          onClick={() => setDeleteCandidate(emp)}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                           title="Delete Employee"
                         >
@@ -262,6 +405,50 @@ export default function Employees() {
           }}
         />
       )}
+
+      {assignmentAction && assignmentEmployee && (
+        <EmployeeAssignmentModal
+          employee={assignmentEmployee}
+          action={assignmentAction}
+          onClose={() => {
+            setAssignmentAction(null);
+            setAssignmentEmployee(null);
+          }}
+          onSaved={() => {
+            setAssignmentAction(null);
+            setAssignmentEmployee(null);
+            load();
+          }}
+        />
+      )}
+
+      <AlertDialog
+        open={Boolean(deleteCandidate)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteCandidate(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Employee Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteCandidate
+                ? `Delete ${deleteCandidate.first_name || ""} ${deleteCandidate.last_name || ""}? This action cannot be undone.`
+                : "Delete this employee? This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? "Deleting..." : "Confirm Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

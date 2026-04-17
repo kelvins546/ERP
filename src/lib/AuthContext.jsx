@@ -1,10 +1,11 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { supabase } from "@/api/base44Client";
 
 const AuthContext = createContext(null);
+const AUTH_STORAGE_KEY = "erp_local_auth_session";
+const SUPERADMIN_EMAIL = "arksuperadmin@gmail.com";
+const SUPERADMIN_PASSWORD = "123456";
 
 export const AuthProvider = ({ children }) => {
-  // We keep all the exact same variables so your layout doesn't crash
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -17,34 +18,82 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAppState = async () => {
-    // 1. Bypass the Base44 "Public Settings" check
     setIsLoadingPublicSettings(false);
     setAuthError(null);
     setAppPublicSettings({ id: "local-app", public_settings: {} });
-
-    // 2. Inject a Dummy Admin User to bypass the login screen
     setIsLoadingAuth(true);
 
-    // Fake network delay to let the UI transition smoothly
-    setTimeout(() => {
-      setUser({
-        id: "admin-123",
-        email: "admin@erp.local",
-        first_name: "Kelvin",
-        last_name: "Admin",
-        role: "super admin",
-      });
-      setIsAuthenticated(true);
+    try {
+      const rawSession = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (rawSession) {
+        const parsed = JSON.parse(rawSession);
+        if (parsed?.email?.toLowerCase() === SUPERADMIN_EMAIL) {
+          setUser(parsed);
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error("Failed to restore auth session:", error);
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
       setIsLoadingAuth(false);
-    }, 500);
+    }
+  };
+
+  const login = async ({ email, password, projectSite }) => {
+    const normalizedEmail = (email || "").trim().toLowerCase();
+    const normalizedPassword = (password || "").trim();
+
+    if (!projectSite?.id) {
+      return { success: false, message: "Please select a project site." };
+    }
+
+    if (
+      normalizedEmail !== SUPERADMIN_EMAIL ||
+      normalizedPassword !== SUPERADMIN_PASSWORD
+    ) {
+      return {
+        success: false,
+        message: "Invalid email or password.",
+      };
+    }
+
+    const authUser = {
+      id: "superadmin-local",
+      email: SUPERADMIN_EMAIL,
+      first_name: "Ark",
+      last_name: "Superadmin",
+      role: "super admin",
+      project_site_id: projectSite.id,
+      project_site_name: projectSite.name,
+    };
+
+    setUser(authUser);
+    setIsAuthenticated(true);
+    setAuthError(null);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authUser));
+
+    return { success: true };
   };
 
   const logout = () => {
-    console.log("Logout clicked - Local dev mode active");
+    setUser(null);
+    setIsAuthenticated(false);
+    setAuthError(null);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
   const navigateToLogin = () => {
-    console.log("Login navigation bypassed - Local dev mode active");
+    setAuthError({ type: "auth_required" });
   };
 
   return (
@@ -56,6 +105,7 @@ export const AuthProvider = ({ children }) => {
         isLoadingPublicSettings,
         authError,
         appPublicSettings,
+        login,
         logout,
         navigateToLogin,
         checkAppState,

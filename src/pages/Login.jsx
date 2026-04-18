@@ -16,7 +16,7 @@ import {
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, authError } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,6 +58,17 @@ export default function Login() {
   const selectedProjectSite = useMemo(() => {
     return projectSites.find((site) => String(site.id) === String(projectSiteId));
   }, [projectSites, projectSiteId]);
+
+  const authStateMessage = useMemo(() => {
+    if (!authError?.type) return "";
+    if (authError.type === "account_deactivated") {
+      return "Your account is deactivated. Please contact HR admin.";
+    }
+    if (authError.type === "user_not_registered") {
+      return "No employee record is linked to this account.";
+    }
+    return "Authentication required. Please sign in.";
+  }, [authError]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -149,6 +160,12 @@ export default function Login() {
               Use your authorized credentials to continue.
             </p>
           </div>
+
+          {authStateMessage ? (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              {authStateMessage}
+            </div>
+          ) : null}
 
           {error ? (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

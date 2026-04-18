@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useSgite } from "react";
+  import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/api/base44Client";
 
 const ACTIVE_STATUSES = ["regular", "probationary", "contractual"];

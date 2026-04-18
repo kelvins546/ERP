@@ -20,6 +20,7 @@ import JobPostings from './pages/JobPostings';
 import Applicants from './pages/Applicants';
 import Interviews from './pages/Interviews';
 import JobOffers from './pages/JobOffers';
+import ActivateAccount from './pages/ActivateAccount';
 import Attendance from './pages/Attendance';
 import Leaves from './pages/Leaves';
 import Overtime from './pages/Overtime';
@@ -88,6 +89,7 @@ const AuthenticatedApp = () => {
           isAuthenticated ? <Navigate to="/" replace /> : <Login />
         }
       />
+      <Route path="/activate-account" element={<ActivateAccount />} />
 
       <Route
         element={

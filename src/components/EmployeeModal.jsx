@@ -3,6 +3,7 @@ import { supabase } from "@/api/base44Client";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createEmployeeInviteAndSendEmail } from "@/lib/employeeInvites";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,6 +133,10 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
     if (!currentForm.last_name?.trim()) nextErrors.last_name = "Last name is required.";
     if (!currentForm.status?.trim()) nextErrors.status = "Employment status is required.";
 
+    if (!isEditing && !currentForm.email?.trim()) {
+      nextErrors.email = "Email is required for account activation invite.";
+    }
+
     if (currentForm.email && !isValidEmail(currentForm.email)) {
       nextErrors.email = "Enter a valid email with a valid domain (e.g. name@company.com).";
     }
@@ -207,20 +212,26 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
 
   useEffect(() => {
     const loadLookups = async () => {
-      const [deptResult, posResult, siteResult, projectSiteIdProbe, projectSiteNameProbe] = await Promise.all([
+      const [deptResult, posResult, siteResult, projectSiteIdProbe] = await Promise.all([
         supabase.from("departments").select("id, name").order("name"),
         supabase.from("positions").select("id, title").order("title"),
         supabase.from("project_sites").select("id, name, location").order("name"),
         supabase.from("employees").select("project_site_id").limit(1),
-        supabase.from("employees").select("project_site_name").limit(1),
       ]);
 
       if (!deptResult.error) setDepartments(deptResult.data || []);
       if (!posResult.error) setPositions(posResult.data || []);
       if (!siteResult.error) setProjectSites(siteResult.data || []);
       if (!projectSiteIdProbe.error) setProjectSiteLinkMode("id");
-      else if (!projectSiteNameProbe.error) setProjectSiteLinkMode("name");
-      else setProjectSiteLinkMode("none");
+      else {
+        const projectSiteNameProbe = await supabase
+          .from("employees")
+          .select("project_site_name")
+          .limit(1);
+
+        if (!projectSiteNameProbe.error) setProjectSiteLinkMode("name");
+        else setProjectSiteLinkMode("none");
+      }
 
       for (const tableName of POSITION_LINK_TABLE_CANDIDATES) {
         const probe = await supabase
@@ -307,6 +318,47 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
             .from(positionLinkTable)
             .insert(rows);
           if (positionsError) throw positionsError;
+        }
+
+        if (!payload.email) {
+          throw new Error("Employee email is required to send the activation link.");
+        }
+
+        try {
+          const displayName = `${payload.first_name || ""} ${payload.last_name || ""}`.trim();
+          const roleLabel =
+            positions.find((position) => String(position.id) === String(payload.position_id))?.title ||
+            "Employee";
+          const departmentLabel =
+            departments.find((dept) => String(dept.id) === String(payload.department_id))?.name ||
+            "";
+          const projectSiteLabel = projectSiteLinkMode === "id"
+            ? projectSites.find((site) => String(site.id) === String(payload.project_site_id))?.name || ""
+            : payload.project_site_name || "";
+
+          await createEmployeeInviteAndSendEmail({
+            employeeId: insertedEmployee.id,
+            email: payload.email,
+            toName: displayName || "Team Member",
+            role: roleLabel,
+            departmentName: departmentLabel,
+            projectSiteName: projectSiteLabel,
+            positionName: roleLabel,
+          });
+        } catch (inviteError) {
+          if (multiPositionMode && positionLinkTable) {
+            await supabase
+              .from(positionLinkTable)
+              .delete()
+              .eq("employee_id", insertedEmployee.id);
+          }
+
+          await supabase
+            .from("employees")
+            .delete()
+            .eq("id", insertedEmployee.id);
+
+          throw inviteError;
         }
       }
 

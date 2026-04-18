@@ -1,6 +1,17 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/AuthContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Users,
   Building2,
@@ -25,6 +36,7 @@ import {
   TrendingUp,
   FolderOpen,
   BookOpen,
+  LogOut,
 } from "lucide-react";
 import { Outlet } from "react-router-dom";
 import arkLogo from "@/assets/imgs/ark-logo.png";
@@ -36,15 +48,16 @@ const navItems = [
     path: "/",
   },
   {
-    label: "Core HR",
+    label: "Manage",
     icon: Users,
     children: [
       { label: "Employee Masterlist", path: "/employees" },
-      { label: "201 File Management", path: "/documents" },
-      { label: "Org Chart", path: "/org-chart" },
+      { label: "Project Sites", path: "/project-sites"},
       { label: "Departments", path: "/departments" },
       { label: "Positions", path: "/positions" },
       { label: "Employee Tasks", path: "/tasks" },
+      { label: "Org Chart", path: "/org-chart" },
+      { label: "201 File Management", path: "/documents" },
       { label: "Announcements", path: "/announcements" },
     ],
   },
@@ -243,6 +256,14 @@ function NavItem({ item, collapsed }) {
 export default function HRISLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="flex h-screen bg-slate-100">
@@ -297,6 +318,20 @@ export default function HRISLayout() {
             <NavItem key={item.label} item={item} collapsed={collapsed} />
           ))}
         </nav>
+
+        <div className="p-3 border-t border-white/10">
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+              "text-white/80 hover:bg-white/10 hover:text-white"
+            )}
+            title="Logout"
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            {!collapsed && <span>Logout</span>}
+          </button>
+        </div>
       </aside>
 
       {/* Main content */}
@@ -322,6 +357,21 @@ export default function HRISLayout() {
           <Outlet />
         </main>
       </div>
+
+      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out of the ERP system?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogout}>Logout</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

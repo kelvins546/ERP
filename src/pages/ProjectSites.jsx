@@ -14,20 +14,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-function DeptModal({
-  dept,
-  onClose,
-  onSaved,
-  projectSites,
-  projectSiteLinkMode,
-}) {
+function ProjectSiteModal({ site, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: "",
+    location: "",
+    address: "",
     description: "",
-    head_employee_id: "",
-    project_site_id: "",
-    project_site_name: "",
-    ...dept,
+    ...site,
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -37,25 +30,21 @@ function DeptModal({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [cleanForm, setCleanForm] = useState({
     name: "",
+    location: "",
+    address: "",
     description: "",
-    head_employee_id: "",
-    project_site_id: "",
-    project_site_name: "",
-    ...dept,
+    ...site,
   });
 
   const validateForm = (currentForm) => {
     const nextErrors = {};
+
     if (!currentForm.name?.trim()) {
-      nextErrors.name = "Department name is required.";
+      nextErrors.name = "Project site name is required.";
     }
 
-    if (projectSiteLinkMode === "id" && !currentForm.project_site_id) {
-      nextErrors.project_site = "Project site is required.";
-    }
-
-    if (projectSiteLinkMode === "name" && !currentForm.project_site_name) {
-      nextErrors.project_site = "Project site is required.";
+    if (!currentForm.location?.trim()) {
+      nextErrors.location = "Location is required.";
     }
 
     return nextErrors;
@@ -85,56 +74,42 @@ function DeptModal({
   };
 
   useEffect(() => {
-    const nextForm = {
-      name: "",
-      description: "",
-      head_employee_id: "",
-      project_site_id: "",
-      project_site_name: "",
-      ...dept,
-    };
-
-    setForm(nextForm);
-    setCleanForm(nextForm);
+    setForm({ name: "", location: "", address: "", description: "", ...site });
+    setCleanForm({ name: "", location: "", address: "", description: "", ...site });
     setErrors({});
     setTouched({});
     setSubmitted(false);
-  }, [dept]);
+  }, [site]);
 
   const requestSaveConfirmation = () => {
     setSubmitted(true);
     const formErrors = validateForm(form);
     setErrors(formErrors);
+
     if (Object.keys(formErrors).length === 0) {
       setShowSaveConfirm(true);
     }
   };
 
-  const persistDept = async () => {
+  const persistProjectSite = async () => {
     setSaving(true);
     try {
       const payload = {
         name: form.name.trim(),
+        location: form.location.trim(),
+        address: form.address?.trim() || null,
         description: form.description?.trim() || null,
-        head_employee_id: form.head_employee_id?.trim() || null,
       };
 
-      if (projectSiteLinkMode === "id") {
-        payload.project_site_id = form.project_site_id || null;
-      }
-
-      if (projectSiteLinkMode === "name") {
-        payload.project_site_name = form.project_site_name || null;
-      }
-
-      if (dept?.id) {
+      if (site?.id) {
         const { error } = await supabase
-          .from("departments")
+          .from("project_sites")
           .update(payload)
-          .eq("id", dept.id);
+          .eq("id", site.id);
+
         if (error) {
           if (error.code === "23505") {
-            setErrors({ name: "A department with this name already exists." });
+            setErrors({ name: "A project site with this name already exists." });
           } else {
             throw error;
           }
@@ -143,10 +118,11 @@ function DeptModal({
           onSaved();
         }
       } else {
-        const { error } = await supabase.from("departments").insert([payload]);
+        const { error } = await supabase.from("project_sites").insert([payload]);
+
         if (error) {
           if (error.code === "23505") {
-            setErrors({ name: "A department with this name already exists." });
+            setErrors({ name: "A project site with this name already exists." });
           } else {
             throw error;
           }
@@ -156,7 +132,7 @@ function DeptModal({
         }
       }
     } catch (error) {
-      console.error("Error saving department:", error.message);
+      console.error("Error saving project site:", error.message);
       setErrors({ form: "Failed to save: " + error.message });
     } finally {
       setSaving(false);
@@ -168,7 +144,7 @@ function DeptModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b">
           <h2 className="text-lg font-semibold">
-            {dept ? "Edit Department" : "Add Department"}
+            {site ? "Edit Project Site" : "Add Project Site"}
           </h2>
           <button onClick={handleCloseClick}>
             <X className="w-5 h-5 text-slate-400 hover:text-slate-700" />
@@ -184,13 +160,13 @@ function DeptModal({
 
           <div>
             <label className="text-xs font-medium text-slate-600">
-              Department Name *
+              Project Site Name *
             </label>
             <Input
               className={`mt-1 ${showError("name") ? "border-red-500" : ""}`}
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
-              placeholder="e.g. Human Resources"
+              placeholder="e.g. Site A - Quezon City"
             />
             {showError("name") && (
               <p className="text-xs text-red-600 mt-1">{errors.name}</p>
@@ -199,56 +175,26 @@ function DeptModal({
 
           <div>
             <label className="text-xs font-medium text-slate-600">
-              Project Site{projectSiteLinkMode !== "none" ? " *" : ""}
+              Location *
             </label>
-            <select
-              className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${
-                showError("project_site") ? "border-red-500" : "border-slate-200"
-              }`}
-              value={
-                projectSiteLinkMode === "id"
-                  ? form.project_site_id || ""
-                  : form.project_site_name || ""
-              }
-              onChange={(e) => {
-                if (projectSiteLinkMode === "id") {
-                  set("project_site_id", e.target.value);
-                  const selected = projectSites.find((s) => s.id === e.target.value);
-                  set("project_site_name", selected?.name || "");
-                } else if (projectSiteLinkMode === "name") {
-                  set("project_site_name", e.target.value);
-                }
-              }}
-              disabled={projectSiteLinkMode === "none"}
-            >
-              <option value="">
-                {projectSiteLinkMode === "none"
-                  ? "No project site link column found"
-                  : "Select project site"}
-              </option>
-              {projectSites.map((site) => (
-                <option
-                  key={site.id}
-                  value={projectSiteLinkMode === "id" ? site.id : site.name}
-                >
-                  {site.name}
-                </option>
-              ))}
-            </select>
-            {showError("project_site") && (
-              <p className="text-xs text-red-600 mt-1">{errors.project_site}</p>
+            <Input
+              className={`mt-1 ${showError("location") ? "border-red-500" : ""}`}
+              value={form.location || ""}
+              onChange={(e) => set("location", e.target.value)}
+              placeholder="e.g. Quezon City"
+            />
+            {showError("location") && (
+              <p className="text-xs text-red-600 mt-1">{errors.location}</p>
             )}
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-600">
-              Department Head ID (UUID)
-            </label>
+            <label className="text-xs font-medium text-slate-600">Address</label>
             <Input
               className="mt-1"
-              value={form.head_employee_id || ""}
-              onChange={(e) => set("head_employee_id", e.target.value)}
-              placeholder="Leave blank for now"
+              value={form.address || ""}
+              onChange={(e) => set("address", e.target.value)}
+              placeholder="e.g. 123 Main St, Barangay, City"
             />
           </div>
 
@@ -259,6 +205,7 @@ function DeptModal({
               rows={3}
               value={form.description || ""}
               onChange={(e) => set("description", e.target.value)}
+              placeholder="Optional notes about this site"
             />
           </div>
         </div>
@@ -268,7 +215,7 @@ function DeptModal({
             Cancel
           </Button>
           <Button onClick={requestSaveConfirmation} disabled={saving}>
-            {saving ? "Saving..." : "Save Department"}
+            {saving ? "Saving..." : "Save Project Site"}
           </Button>
         </div>
       </div>
@@ -277,18 +224,18 @@ function DeptModal({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {dept ? "Confirm Department Update" : "Confirm New Department"}
+              {site ? "Confirm Project Site Update" : "Confirm New Project Site"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {dept
-                ? "Are you sure the edited department information is correct?"
-                : "Are you sure the department information is correct before adding this record?"}
+              {site
+                ? "Are you sure the edited project site information is correct?"
+                : "Are you sure the project site information is correct before adding this record?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={saving}>Review Details</AlertDialogCancel>
-            <AlertDialogAction onClick={persistDept} disabled={saving}>
-              {saving ? "Saving..." : dept ? "Confirm Update" : "Confirm Add"}
+            <AlertDialogAction onClick={persistProjectSite} disabled={saving}>
+              {saving ? "Saving..." : site ? "Confirm Update" : "Confirm Add"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -317,54 +264,43 @@ function DeptModal({
   );
 }
 
-export default function Departments() {
-  const [depts, setDepts] = useState([]);
-  const [projectSites, setProjectSites] = useState([]);
-  const [projectSiteLinkMode, setProjectSiteLinkMode] = useState("none");
+export default function ProjectSites() {
+  const [sites, setSites] = useState([]);
+  const [locationOptions, setLocationOptions] = useState([]);
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [editDept, setEditDept] = useState(null);
+  const [editSite, setEditSite] = useState(null);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const [deleting, setDeleting] = useState(false);
-
-  const detectProjectSiteLinkMode = async () => {
-    const idProbe = await supabase
-      .from("departments")
-      .select("project_site_id")
-      .limit(1);
-    if (!idProbe.error) return "id";
-
-    const nameProbe = await supabase
-      .from("departments")
-      .select("project_site_name")
-      .limit(1);
-    if (!nameProbe.error) return "name";
-
-    return "none";
-  };
 
   const load = async () => {
     try {
       setLoading(true);
       setLoadError("");
 
-      const [mode, deptResult, siteResult] = await Promise.all([
-        detectProjectSiteLinkMode(),
-        supabase.from("departments").select("*").order("name", { ascending: true }),
-        supabase.from("project_sites").select("id, name, location").order("name", { ascending: true }),
-      ]);
+      const { data, error } = await supabase
+        .from("project_sites")
+        .select("*")
+        .order("name", { ascending: true });
 
-      setProjectSiteLinkMode(mode);
-      if (deptResult.error) throw deptResult.error;
-      if (siteResult.error) throw siteResult.error;
+      if (error) throw error;
+      const rows = data || [];
+      setSites(rows);
 
-      setDepts(deptResult.data || []);
-      setProjectSites(siteResult.data || []);
+      const uniqueLocations = [
+        ...new Set(
+          rows
+            .map((row) => String(row.location || "").trim())
+            .filter(Boolean)
+        ),
+      ].sort((a, b) => a.localeCompare(b));
+      setLocationOptions(uniqueLocations);
     } catch (error) {
-      console.error("Failed to load departments:", error.message);
-      setLoadError(error.message || "Failed to load departments.");
+      console.error("Failed to load project sites:", error.message);
+      setLoadError(error.message || "Failed to load project sites.");
     } finally {
       setLoading(false);
     }
@@ -377,11 +313,13 @@ export default function Departments() {
   const handleDelete = async () => {
     if (!deleteCandidate) return;
     setDeleting(true);
+
     try {
       const { error } = await supabase
-        .from("departments")
+        .from("project_sites")
         .delete()
         .eq("id", deleteCandidate.id);
+
       if (error) throw error;
       setDeleteCandidate(null);
       load();
@@ -389,60 +327,45 @@ export default function Departments() {
       console.error("Delete failed:", error.message);
       if (error.code === "23503") {
         alert(
-          "Cannot delete this department because there are employees assigned to it. Move the employees first."
+          "Cannot delete this project site because it is being used by related records."
         );
       } else {
-        alert("Failed to delete department.");
+        alert("Failed to delete project site.");
       }
     } finally {
       setDeleting(false);
     }
   };
 
-  const projectSitesById = projectSites.reduce((acc, site) => {
-    acc[site.id] = site;
-    return acc;
-  }, {});
-
-  const getProjectSiteLabel = (dept) => {
-    if (projectSiteLinkMode === "id") {
-      const site = projectSitesById[dept.project_site_id];
-      return site ? `${site.name}${site.location ? ` (${site.location})` : ""}` : "—";
-    }
-
-    if (projectSiteLinkMode === "name") {
-      return dept.project_site_name || "—";
-    }
-
-    return "—";
-  };
-
-  const filtered = depts.filter((dept) => {
+  const filteredSites = sites.filter((site) => {
+    const matchLocation =
+      locationFilter === "all" ? true : site.location === locationFilter;
     const term = search.trim().toLowerCase();
-    if (!term) return true;
+    const matchSearch =
+      !term ||
+      (site.name || "").toLowerCase().includes(term) ||
+      (site.location || "").toLowerCase().includes(term) ||
+      (site.address || "").toLowerCase().includes(term) ||
+      (site.description || "").toLowerCase().includes(term);
 
-    return (
-      (dept.name || "").toLowerCase().includes(term) ||
-      (dept.description || "").toLowerCase().includes(term) ||
-      getProjectSiteLabel(dept).toLowerCase().includes(term)
-    );
+    return matchLocation && matchSearch;
   });
 
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Departments</h1>
-          <p className="text-slate-500 text-sm">{depts.length} total departments</p>
+          <h1 className="text-2xl font-bold text-slate-900">Project Sites</h1>
+          <p className="text-slate-500 text-sm">{sites.length} total project sites</p>
         </div>
         <Button
           onClick={() => {
-            setEditDept(null);
+            setEditSite(null);
             setShowModal(true);
           }}
           className="gap-2"
         >
-          <Plus className="w-4 h-4" /> Add Department
+          <Plus className="w-4 h-4" /> Add Project Site
         </Button>
       </div>
 
@@ -450,20 +373,25 @@ export default function Departments() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder="Search by department, description, or project site..."
+            placeholder="Search by name, location, address, or description..."
             className="pl-9 bg-white"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <select
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+          value={locationFilter}
+          onChange={(e) => setLocationFilter(e.target.value)}
+        >
+          <option value="all">All Locations</option>
+          {locationOptions.map((location) => (
+            <option key={location} value={location}>
+              {location}
+            </option>
+          ))}
+        </select>
       </div>
-
-      {projectSiteLinkMode === "none" && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-          Could not find project site link column in departments table. Add either
-          project_site_id or project_site_name in your database.
-        </div>
-      )}
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -473,20 +401,20 @@ export default function Departments() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           {loadError && (
             <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              Error loading departments: {loadError}
+              Error loading project sites: {loadError}
             </div>
           )}
 
-          {filtered.length === 0 ? (
+          {filteredSites.length === 0 ? (
             <div className="text-center py-16 text-slate-400">
-              <p>No departments found.</p>
+              <p>No project sites found.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    {["Department", "Project Site", "Head", "Description", "Actions"].map((h) => (
+                    {["Project Site", "Location", "Address", "Description", "Actions"].map((h) => (
                       <th
                         key={h}
                         className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
@@ -497,38 +425,32 @@ export default function Departments() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map((d) => (
-                    <tr key={d.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-slate-900">{d.name}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{getProjectSiteLabel(d)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {d.head_employee_id ? (
-                          <span title={d.head_employee_id}>{d.head_employee_id.substring(0, 8)}...</span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
+                  {filteredSites.map((site) => (
+                    <tr key={site.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-sm font-medium text-slate-900">{site.name}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{site.location || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{site.address || "—"}</td>
                       <td className="px-4 py-3 text-sm text-slate-600 max-w-xs">
-                        <p className="truncate" title={d.description || "—"}>
-                          {d.description || "—"}
+                        <p className="truncate" title={site.description || "—"}>
+                          {site.description || "—"}
                         </p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => {
-                              setEditDept(d);
+                              setEditSite(site);
                               setShowModal(true);
                             }}
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Edit Department"
+                            title="Edit Project Site"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => setDeleteCandidate(d)}
+                            onClick={() => setDeleteCandidate(site)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete Department"
+                            title="Delete Project Site"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -544,10 +466,8 @@ export default function Departments() {
       )}
 
       {showModal && (
-        <DeptModal
-          dept={editDept}
-          projectSites={projectSites}
-          projectSiteLinkMode={projectSiteLinkMode}
+        <ProjectSiteModal
+          site={editSite}
           onClose={() => setShowModal(false)}
           onSaved={() => {
             setShowModal(false);
@@ -562,7 +482,7 @@ export default function Departments() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Department</AlertDialogTitle>
+            <AlertDialogTitle>Delete Project Site</AlertDialogTitle>
             <AlertDialogDescription>
               Delete {deleteCandidate?.name}? This action cannot be undone.
             </AlertDialogDescription>

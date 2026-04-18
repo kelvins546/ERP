@@ -1,14 +1,16 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import HRISLayout from './components/HRISLayout';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Departments from './pages/Departments';
+import ProjectSites from './pages/ProjectSites';
 import Positions from './pages/Positions';
 import Announcements from './pages/Announcements';
 import Tasks from './pages/Tasks';
@@ -18,6 +20,7 @@ import JobPostings from './pages/JobPostings';
 import Applicants from './pages/Applicants';
 import Interviews from './pages/Interviews';
 import JobOffers from './pages/JobOffers';
+import ActivateAccount from './pages/ActivateAccount';
 import Attendance from './pages/Attendance';
 import Leaves from './pages/Leaves';
 import Overtime from './pages/Overtime';
@@ -59,7 +62,7 @@ import FinancialStatements from './features/accounting/pages/FinancialStatements
 import AccountsPayable from './features/accounting/pages/AccountsPayable';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -74,20 +77,29 @@ const AuthenticatedApp = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
     }
   }
 
   // Render the main app
   return (
     <Routes>
-      <Route element={<HRISLayout />}>
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? <Navigate to="/" replace /> : <Login />
+        }
+      />
+      <Route path="/activate-account" element={<ActivateAccount />} />
+
+      <Route
+        element={
+          isAuthenticated ? <HRISLayout /> : <Navigate to="/login" replace />
+        }
+      >
         <Route path="/" element={<Dashboard />} />
         <Route path="/employees" element={<Employees />} />
         <Route path="/departments" element={<Departments />} />
+        <Route path="/project-sites" element={<ProjectSites />} />
         <Route path="/positions" element={<Positions />} />
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/tasks" element={<Tasks />} />
@@ -141,6 +153,8 @@ const AuthenticatedApp = () => {
         <Route path="/accounting/accounts-payable" element={<AccountsPayable />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
+
+      <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
     </Routes>
   );
 };

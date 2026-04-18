@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
-import { Plus, X, DollarSign } from "lucide-react";
+import { supabase } from "@/api/base44Client";
+import { Plus, X, DollarSign, Calendar, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -18,34 +18,58 @@ function PeriodModal({ period, onClose, onSaved }) {
     start_date: "",
     end_date: "",
     pay_date: "",
-    processing_status: period?.status || "draft", // Map DB 'status' to UI state
+    processing_status: period?.status || "draft",
     ...period,
   });
 
   const [saving, setSaving] = useState(false);
+  const [isAutoName, setIsAutoName] = useState(!period?.id);
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    if (isAutoName && form.start_date && form.end_date) {
+      const start = new Date(form.start_date);
+      const end = new Date(form.end_date);
+
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        const startStr = start.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+        const endStr = end.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        set("name", `${startStr} - ${endStr}`);
+      }
+    }
+  }, [form.start_date, form.end_date, isAutoName]);
+
+  const handleNameChange = (e) => {
+    setIsAutoName(false);
+    set("name", e.target.value);
+  };
 
   const save = async () => {
     setSaving(true);
     try {
-      // Build payload matching standard SQL schema
       const payload = {
         name: form.name || null,
         start_date: form.start_date,
         end_date: form.end_date,
         pay_date: form.pay_date || null,
-        status: form.processing_status, // Save as 'status' in DB
+        status: form.processing_status,
       };
 
       if (period?.id) {
-        // UPDATE
         const { error } = await supabase
           .from("payroll_periods")
           .update(payload)
           .eq("id", period.id);
         if (error) throw error;
       } else {
-        // CREATE
         const { error } = await supabase
           .from("payroll_periods")
           .insert([payload]);
@@ -54,8 +78,6 @@ function PeriodModal({ period, onClose, onSaved }) {
       onSaved();
     } catch (error) {
       console.error("Error saving payroll period:", error.message);
-
-      // If Supabase complains the table doesn't exist, provide a helpful alert
       if (error.code === "42P01") {
         alert(
           "Table 'payroll_periods' does not exist in Supabase yet. Please run the SQL schema creation script.",
@@ -70,86 +92,135 @@ function PeriodModal({ period, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between p-5 border-b">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
           <h2 className="text-lg font-semibold">
             {period ? "Edit Period" : "New Payroll Period"}
           </h2>
-          <button onClick={onClose}>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-slate-100 rounded-full transition-colors"
+          >
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="text-xs font-medium text-slate-600">
-              Period Name
-            </label>
-            <Input
-              className="mt-1"
-              value={form.name || ""}
-              onChange={(e) => set("name", e.target.value)}
-              placeholder="e.g. March 1–15 2026"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-slate-600">
-                Start Date *
-              </label>
-              <Input
-                className="mt-1"
-                type="date"
-                value={form.start_date}
-                onChange={(e) => set("start_date", e.target.value)}
-              />
+
+        <div className="p-5 space-y-5">
+          {/* SECTION 1: Coverage Dates */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5" /> 1. Coverage Dates
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600">
+                  Start Date *
+                </label>
+                <Input
+                  className="mt-1 focus-visible:ring-[#2E6F40]"
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => set("start_date", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">
+                  End Date *
+                </label>
+                <Input
+                  className="mt-1 focus-visible:ring-[#2E6F40]"
+                  type="date"
+                  value={form.end_date}
+                  onChange={(e) => set("end_date", e.target.value)}
+                />
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600">
-                End Date *
+                Period Name *
               </label>
               <Input
-                className="mt-1"
-                type="date"
-                value={form.end_date}
-                onChange={(e) => set("end_date", e.target.value)}
+                className="mt-1 focus-visible:ring-[#2E6F40]"
+                value={form.name || ""}
+                onChange={handleNameChange}
+                placeholder="e.g. March 1 - 15, 2026"
               />
+              {isAutoName && form.start_date && (
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Auto-generated based on dates.
+                </p>
+              )}
             </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600">
-              Pay Date
-            </label>
-            <Input
-              className="mt-1"
-              type="date"
-              value={form.pay_date || ""}
-              onChange={(e) => set("pay_date", e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600">Status</label>
-            <select
-              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              value={form.processing_status}
-              onChange={(e) => set("processing_status", e.target.value)}
-            >
-              {["draft", "processing", "finalized", "paid"].map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
-              ))}
-            </select>
+
+          <hr className="border-slate-100" />
+
+          {/* SECTION 2: Processing Workflow */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              2. Disbursement & Status
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600">
+                  Target Pay Date
+                </label>
+                <Input
+                  className="mt-1 focus-visible:ring-[#2E6F40]"
+                  type="date"
+                  value={form.pay_date || ""}
+                  onChange={(e) => set("pay_date", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">
+                  Current Status
+                </label>
+                <select
+                  className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E6F40]"
+                  value={form.processing_status}
+                  onChange={(e) => set("processing_status", e.target.value)}
+                >
+                  <option value="draft">Draft</option>
+                  <option value="processing">Processing</option>
+                  <option value="finalized">Finalized</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex gap-2 items-start mt-2">
+              <Info className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+              <div className="text-[10px] text-slate-600 leading-tight space-y-1">
+                <p>
+                  <strong>Draft:</strong> Creating the period, importing
+                  attendance.
+                </p>
+                <p>
+                  <strong>Processing:</strong> Computing payslips and
+                  deductions.
+                </p>
+                <p>
+                  <strong>Finalized:</strong> Locked. Ready for bank
+                  disbursement.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex justify-end gap-3 p-5 border-t">
+
+        <div className="flex justify-end gap-3 p-5 border-t sticky bottom-0 bg-white z-10">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
+            className="bg-[#2E6F40] hover:bg-[#235330] text-white"
             onClick={save}
-            disabled={saving || !form.start_date || !form.end_date}
+            disabled={
+              saving || !form.start_date || !form.end_date || !form.name
+            }
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? "Saving..." : "Save Period"}
           </Button>
         </div>
       </div>
@@ -167,7 +238,6 @@ export default function Payroll() {
   const load = async () => {
     try {
       setLoading(true);
-      // Supabase Read - Ordered by newest start date first
       const { data, error } = await supabase
         .from("payroll_periods")
         .select("*")
@@ -187,7 +257,6 @@ export default function Payroll() {
     load();
   }, []);
 
-  // Helper to safely format dates
   const formatDate = (dateString) => {
     if (!dateString) return "—";
     return new Date(dateString).toLocaleDateString(undefined, {
@@ -200,13 +269,18 @@ export default function Payroll() {
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Payroll Periods</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Payroll Periods</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Manage processing cycles and disbursement dates.
+          </p>
+        </div>
         <Button
           onClick={() => {
             setEditPeriod(null);
             setShowModal(true);
           }}
-          className="gap-2"
+          className="bg-[#2E6F40] hover:bg-[#235330] text-white gap-2"
         >
           <Plus className="w-4 h-4" /> New Period
         </Button>
@@ -214,7 +288,7 @@ export default function Payroll() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
         </div>
       ) : (
         <div className="space-y-3">
@@ -233,22 +307,24 @@ export default function Payroll() {
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
-                    <DollarSign className="w-5 h-5 text-green-600" />
+                  <div className="w-10 h-10 bg-[#2E6F40]/10 rounded-xl flex items-center justify-center shrink-0">
+                    <DollarSign className="w-5 h-5 text-[#2E6F40]" />
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900 text-lg">
                       {p.name ||
-                        `${formatDate(p.start_date)} – ${formatDate(p.end_date)}`}
+                        `${formatDate(p.start_date)} - ${formatDate(p.end_date)}`}
                     </p>
                     <p className="text-sm text-slate-500 mt-0.5">
-                      Pay Date: {formatDate(p.pay_date)}
+                      Target Pay Date:{" "}
+                      <span className="font-medium text-slate-700">
+                        {formatDate(p.pay_date)}
+                      </span>
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-6 text-right shrink-0">
-                  {/* Note: total_gross and total_net might be calculated later based on payslips */}
                   {p.total_gross && (
                     <div>
                       <p className="text-xs text-slate-400 font-medium">
@@ -262,13 +338,13 @@ export default function Payroll() {
                   {p.total_net && (
                     <div>
                       <p className="text-xs text-slate-400 font-medium">Net</p>
-                      <p className="font-semibold text-green-700">
+                      <p className="font-semibold text-[#2E6F40]">
                         ₱{Number(p.total_net).toLocaleString()}
                       </p>
                     </div>
                   )}
                   <span
-                    className={`text-xs font-semibold px-3 py-1 rounded-full capitalize ${statusColors[p.status || "draft"]}`}
+                    className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider ${statusColors[p.status || "draft"]}`}
                   >
                     {p.status || "draft"}
                   </span>

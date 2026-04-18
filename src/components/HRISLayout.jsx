@@ -27,6 +27,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { Outlet } from "react-router-dom";
+import arkLogo from "@/assets/imgs/ark-logo.png";
 
 const navItems = [
   {
@@ -99,6 +100,7 @@ const navItems = [
       { label: "Attrition Report", path: "/reports/attrition" },
     ],
   },
+  /* --- COMMENTED OUT MODULES ---
   {
     label: "Procurement",
     icon: ShoppingCart,
@@ -162,6 +164,7 @@ const navItems = [
       { label: "Accounts Payable", path: "/accounting/accounts-payable" },
     ],
   },
+  -------------------------------- */
 ];
 
 function NavItem({ item, collapsed }) {
@@ -261,9 +264,18 @@ export default function HRISLayout() {
       >
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           {!collapsed && (
-            <div>
-              <p className="text-white font-bold text-lg">Ark Industries</p>
-              <p className="text-white/70 text-xs">Superadmin</p>
+            <div className="flex items-center gap-3">
+              <img
+                src={arkLogo}
+                alt="Ark Logo"
+                className="w-9 h-9 bg-white rounded p-1 object-contain shrink-0"
+              />
+              <div>
+                <p className="text-white font-bold text-lg leading-tight">
+                  Ark Industries
+                </p>
+                <p className="text-white/70 text-xs mt-0.5">Superadmin</p>
+              </div>
             </div>
           )}
           <button

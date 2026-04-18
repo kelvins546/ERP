@@ -57,6 +57,7 @@ import ChartOfAccounts from './features/accounting/pages/ChartOfAccounts';
 import JournalEntries from './features/accounting/pages/JournalEntries';
 import FinancialStatements from './features/accounting/pages/FinancialStatements';
 import AccountsPayable from './features/accounting/pages/AccountsPayable';
+import PublicJobView from './pages/PublicJobView';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -139,6 +140,7 @@ const AuthenticatedApp = () => {
         <Route path="/accounting/journal-entries" element={<JournalEntries />} />
         <Route path="/accounting/financial-statements" element={<FinancialStatements />} />
         <Route path="/accounting/accounts-payable" element={<AccountsPayable />} />
+        <Route path="/jobs/:id" element={<PublicJobView />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
     </Routes>

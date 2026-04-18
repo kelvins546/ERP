@@ -333,19 +333,6 @@ function PosModal({
             )}
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-slate-600">Salary Grade</label>
-            <Input
-              className="mt-1"
-              value={form.salary_grade || ""}
-              readOnly
-              placeholder=""
-            />
-            <p className="text-[11px] text-slate-500 mt-1">
-              Input the minimum and maximum salary.
-            </p>
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600">Min Salary (PHP)</label>
@@ -369,6 +356,20 @@ function PosModal({
           {showError("salary_range") && (
             <p className="text-xs text-red-600">{errors.salary_range}</p>
           )}
+
+          <div>
+            <label className="text-xs font-medium text-slate-600">Salary Grade</label>
+            <Input
+              className="mt-1 bg-slate-50 text-slate-700"
+              value={form.salary_grade || ""}
+              readOnly
+              disabled
+              placeholder="Auto-computed"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Automatically computed from minimum and maximum salary.
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 p-5 border-t">

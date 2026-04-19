@@ -401,8 +401,7 @@ function ShareModal({ posting, onClose }) {
 
   const [copyStatus, setCopyStatus] = useState(""); // Tracks which button was clicked
 
-  const baseUrl =
-    import.meta.env.VITE_PUBLIC_SITE_URL || window.location.origin;
+  const baseUrl = window.location.origin;
   const url = `${baseUrl}/jobs/${posting.id}`;
   const encodedUrl = encodeURIComponent(url);
   const tweetText = encodeURIComponent(

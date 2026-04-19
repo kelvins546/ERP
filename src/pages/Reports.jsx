@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
+import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "@/api/base44Client";
 import {
   BarChart,
   Bar,
@@ -14,14 +15,15 @@ import {
   Legend,
 } from "recharts";
 
+// Updated to use Ark Industries Brand Colors
 const COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#06b6d4",
+  "#2E6F40", // Brand Green
+  "#f59e0b", // Amber
+  "#8b5cf6", // Purple
+  "#06b6d4", // Cyan
+  "#ec4899", // Pink
+  "#10b981", // Emerald
+  "#ef4444", // Red
 ];
 
 // --- HEADCOUNT REPORT ---
@@ -35,7 +37,7 @@ function HeadcountReport() {
       try {
         const { data: emps, error } = await supabase
           .from("employees")
-          .select("*, departments(name)");
+          .select("*, departments!department_id(name)");
 
         if (error) throw error;
         setEmpList(emps || []);
@@ -71,7 +73,7 @@ function HeadcountReport() {
           ["Total", empList.length, "text-slate-900"],
           ["Active", active, "text-green-600"],
           ["Separated", separated, "text-red-500"],
-          ["Departments", data.length, "text-blue-600"],
+          ["Departments", data.length, "text-[#2E6F40]"],
         ].map(([l, v, c]) => (
           <div
             key={l}
@@ -86,7 +88,7 @@ function HeadcountReport() {
       </div>
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
@@ -123,7 +125,7 @@ function HeadcountReport() {
               <Bar
                 dataKey="value"
                 name="Employees"
-                fill="#3b82f6"
+                fill="#2E6F40"
                 radius={[4, 4, 0, 0]}
                 barSize={40}
               />
@@ -151,7 +153,6 @@ function LeaveReport() {
         const byType = {};
         leaves.forEach((l) => {
           const k = l.leave_type || "other";
-          // Note: total_days might be null in DB, fallback to 1
           byType[k] = (byType[k] || 0) + (Number(l.total_days) || 1);
         });
         setData(
@@ -170,7 +171,7 @@ function LeaveReport() {
     <div className="space-y-6 animate-in fade-in duration-500">
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
@@ -239,7 +240,7 @@ function PayrollReport() {
     <div className="space-y-6 animate-in fade-in duration-500">
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
@@ -268,13 +269,13 @@ function PayrollReport() {
               <Bar
                 dataKey="gross"
                 name="Gross Pay"
-                fill="#3b82f6"
+                fill="#94a3b8"
                 radius={[4, 4, 0, 0]}
               />
               <Bar
                 dataKey="net"
                 name="Net Pay"
-                fill="#10b981"
+                fill="#2E6F40"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
@@ -295,7 +296,7 @@ function AttritionReport() {
       try {
         const { data, error } = await supabase
           .from("employees")
-          .select("*, departments(name), positions(title)");
+          .select("*, departments!department_id(name), positions(title)");
         if (error) throw error;
         setEmps(data || []);
       } catch (err) {
@@ -334,7 +335,7 @@ function AttritionReport() {
       </div>
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -410,9 +411,23 @@ const reportTypes = [
 ];
 
 export default function Reports() {
-  const [activeKey, setActiveKey] = useState("headcount");
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // FIX: Grab the current tab dynamically from the URL (e.g. from /reports/leaves -> 'leaves')
+  const currentPath = location.pathname.split("/").pop();
+
+  // Verify it's a valid key, otherwise fallback to "headcount"
+  const activeKey = reportTypes.some((r) => r.key === currentPath)
+    ? currentPath
+    : "headcount";
+
   const active = reportTypes.find((r) => r.key === activeKey) || reportTypes[0];
   const Component = active.component;
+
+  const handleTabChange = (key) => {
+    navigate(`/reports/${key}`);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -431,16 +446,16 @@ export default function Reports() {
         {reportTypes.map((r) => (
           <button
             key={r.key}
-            onClick={() => setActiveKey(r.key)}
+            onClick={() => handleTabChange(r.key)}
             className={`px-4 py-2 text-sm font-medium transition-all relative ${
               activeKey === r.key
-                ? "text-blue-600"
+                ? "text-[#2E6F40]"
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
             {r.label}
             {activeKey === r.key && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2E6F40] rounded-t-full" />
             )}
           </button>
         ))}

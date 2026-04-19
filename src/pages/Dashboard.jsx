@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/api/base44Client"; // <-- Using the clean Supabase client
+import { supabase } from "@/api/base44Client";
 import {
   Users,
   Clock,
   Briefcase,
-  DollarSign,
   TrendingUp,
   AlertCircle,
   CheckCircle,
@@ -27,7 +26,6 @@ export default function Dashboard() {
       try {
         setLoading(true);
 
-        // Fetch counts securely and efficiently using Supabase
         const [
           { count: empCount },
           { count: leavesCount },
@@ -67,7 +65,7 @@ export default function Dashboard() {
       } catch (error) {
         console.error("Dashboard Error:", error.message);
       } finally {
-        setLoading(false); // <-- The guaranteed Spinner Killer
+        setLoading(false);
       }
     };
 
@@ -79,28 +77,28 @@ export default function Dashboard() {
       label: "Total Employees",
       value: stats.employees,
       icon: Users,
-      color: "bg-blue-500",
+      color: "bg-[#2E6F40]", // Brand Primary Green
       link: "/employees",
     },
     {
       label: "Pending Leaves",
       value: stats.leaves,
       icon: Calendar,
-      color: "bg-yellow-500",
+      color: "bg-amber-500", // Amber for pending/attention
       link: "/leaves",
     },
     {
       label: "Open Job Postings",
       value: stats.openJobs,
       icon: Briefcase,
-      color: "bg-green-500",
+      color: "bg-slate-700", // Professional Slate
       link: "/job-postings",
     },
     {
       label: "Pending Overtime",
       value: stats.pendingOT,
       icon: Clock,
-      color: "bg-purple-500",
+      color: "bg-[#235330]", // Brand Dark Green
       link: "/overtime",
     },
   ];
@@ -108,7 +106,7 @@ export default function Dashboard() {
   if (loading)
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
       </div>
     );
 
@@ -129,16 +127,18 @@ export default function Dashboard() {
             <Link
               key={card.label}
               to={card.link}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow group"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-500">{card.label}</p>
+                  <p className="text-sm font-medium text-slate-500 group-hover:text-slate-700 transition-colors">
+                    {card.label}
+                  </p>
                   <p className="text-3xl font-bold text-slate-900 mt-1">
                     {card.value}
                   </p>
                 </div>
-                <div className={`${card.color} p-3 rounded-xl`}>
+                <div className={`${card.color} p-3 rounded-xl shadow-sm`}>
                   <Icon className="w-6 h-6 text-white" />
                 </div>
               </div>
@@ -155,7 +155,7 @@ export default function Dashboard() {
           </h2>
           <Link
             to="/announcements"
-            className="text-blue-600 text-sm hover:underline"
+            className="text-[#2E6F40] font-medium text-sm hover:underline"
           >
             View all
           </Link>
@@ -169,9 +169,9 @@ export default function Dashboard() {
             {announcements.map((a) => (
               <div
                 key={a.id}
-                className="flex items-start gap-3 p-3 rounded-lg bg-slate-50"
+                className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100"
               >
-                <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                <AlertCircle className="w-5 h-5 text-[#2E6F40] mt-0.5 shrink-0" />
                 <div>
                   <p className="font-medium text-slate-800 text-sm">
                     {a.title}
@@ -179,8 +179,7 @@ export default function Dashboard() {
                   <p className="text-slate-500 text-xs mt-0.5 line-clamp-2">
                     {a.content}
                   </p>
-                  {/* Changed from created_date to created_at to match our SQL schema */}
-                  <p className="text-slate-400 text-xs mt-1">
+                  <p className="text-slate-400 text-[10px] uppercase font-semibold mt-1.5 tracking-wider">
                     {new Date(a.created_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -196,28 +195,24 @@ export default function Dashboard() {
           {
             label: "Add Employee",
             link: "/employees",
-            color: "text-blue-600 bg-blue-50 border-blue-200",
           },
           {
             label: "Process Payroll",
             link: "/payroll",
-            color: "text-green-600 bg-green-50 border-green-200",
           },
           {
             label: "Approve Leaves",
             link: "/leaves",
-            color: "text-yellow-600 bg-yellow-50 border-yellow-200",
           },
           {
             label: "View Reports",
-            link: "/reports/headcount",
-            color: "text-purple-600 bg-purple-50 border-purple-200",
+            link: "/reports?tab=headcount", // Fixed routing link
           },
         ].map((q) => (
           <Link
             key={q.label}
             to={q.link}
-            className={`border rounded-xl p-4 text-sm font-medium text-center hover:shadow-sm transition-shadow ${q.color}`}
+            className="border border-[#2E6F40]/20 bg-[#2E6F40]/5 text-[#2E6F40] rounded-xl p-4 text-sm font-semibold text-center hover:bg-[#2E6F40]/10 transition-colors"
           >
             {q.label}
           </Link>

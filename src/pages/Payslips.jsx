@@ -309,7 +309,6 @@ function PayslipPreviewModal({ payslip, onClose }) {
     </html>
   `;
 
-  // Function to grab the iframe window and trigger the print prompt
   const handlePrint = () => {
     if (iframeRef.current) {
       iframeRef.current.contentWindow.print();
@@ -331,7 +330,6 @@ function PayslipPreviewModal({ payslip, onClose }) {
           </button>
         </div>
 
-        {/* IFRAME CONTAINER */}
         <div className="flex-1 bg-slate-100 overflow-hidden p-6 flex justify-center">
           <iframe
             ref={iframeRef}
@@ -446,6 +444,7 @@ function PayslipModal({
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  // --- UPDATED SMART COMPUTE ENGINE ---
   const handleAutoCompute = async () => {
     if (!form.employee_id) {
       setAlertConfig({
@@ -457,6 +456,7 @@ function PayslipModal({
     }
     setComputing(true);
     try {
+      // 1. Fetch Profile
       const { data: profile, error: profileErr } = await supabase
         .from("salary_profiles")
         .select("*")
@@ -469,6 +469,7 @@ function PayslipModal({
         );
       }
 
+      // 2. Fetch Loans
       const { data: loans, error: loansErr } = await supabase
         .from("company_loans")
         .select("deduction_per_period")
@@ -481,6 +482,28 @@ function PayslipModal({
           (sum, loan) => sum + Number(loan.deduction_per_period),
           0,
         );
+      }
+
+      // 3. Fetch Allowances & Apply Smart Frequency Math
+      const { data: activeAllowances, error: allowErr } = await supabase
+        .from("employee_allowances")
+        .select("amount, frequency")
+        .eq("employee_id", form.employee_id);
+
+      let totalAllowances = 0;
+      if (activeAllowances && !allowErr) {
+        totalAllowances = activeAllowances.reduce((sum, a) => {
+          let amt = Number(a.amount);
+
+          // Smart Math: If employee is Semi-Monthly, but allowance is Monthly, cut it in half!
+          if (
+            profile.pay_frequency === "semi_monthly" &&
+            a.frequency === "monthly"
+          ) {
+            amt = amt / 2;
+          }
+          return sum + amt;
+        }, 0);
       }
 
       const semiMonthlyPay =
@@ -504,7 +527,7 @@ function PayslipModal({
       setForm((f) => ({
         ...f,
         gross_pay: semiMonthlyPay,
-        allowances: Number(profile.de_minimis_allowance || 0),
+        allowances: totalAllowances,
         sss_deduction: finalSSS,
         philhealth_deduction: finalPhilhealth,
         pagibig_deduction: finalPagibig,
@@ -835,7 +858,6 @@ export default function Payslips() {
     periodName: "",
   });
 
-  // New State for handling the Preview Modal
   const [previewPayslip, setPreviewPayslip] = useState(null);
 
   const [alertConfig, setAlertConfig] = useState({
@@ -1025,7 +1047,6 @@ export default function Payslips() {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          {/* Open the Preview Modal instead of printing directly */}
                           <button
                             onClick={() => setPreviewPayslip(p)}
                             className="p-1.5 text-slate-400 hover:text-[#2E6F40] hover:bg-[#2E6F40]/10 rounded transition-colors"
@@ -1061,7 +1082,6 @@ export default function Payslips() {
           </div>
         )}
 
-        {/* Modals */}
         {showModal && (
           <PayslipModal
             payslip={editPayslip}

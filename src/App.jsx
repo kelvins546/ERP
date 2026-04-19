@@ -3,19 +3,17 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
 import {
   BrowserRouter as Router,
-  Navigate,
   Route,
   Routes,
+  useLocation,
 } from "react-router-dom";
 import PageNotFound from "./lib/PageNotFound";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import HRISLayout from "./components/HRISLayout";
-import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
 import Departments from "./pages/Departments";
-import ProjectSites from "./pages/ProjectSites";
 import Positions from "./pages/Positions";
 import Announcements from "./pages/Announcements";
 import Tasks from "./pages/Tasks";
@@ -25,7 +23,6 @@ import JobPostings from "./pages/JobPostings";
 import Applicants from "./pages/Applicants";
 import Interviews from "./pages/Interviews";
 import JobOffers from "./pages/JobOffers";
-import ActivateAccount from "./pages/ActivateAccount";
 import Attendance from "./pages/Attendance";
 import Leaves from "./pages/Leaves";
 import Overtime from "./pages/Overtime";
@@ -65,10 +62,15 @@ import ChartOfAccounts from "./features/accounting/pages/ChartOfAccounts";
 import JournalEntries from "./features/accounting/pages/JournalEntries";
 import FinancialStatements from "./features/accounting/pages/FinancialStatements";
 import AccountsPayable from "./features/accounting/pages/AccountsPayable";
+import PublicJobView from "./pages/PublicJobView";
 
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated } =
+const AppContent = () => {
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } =
     useAuth();
+  const location = useLocation();
+
+  // Detect if the user is on a public page (like a job posting) so we don't block them
+  const isPublicRoute = location.pathname.startsWith("/jobs/");
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -79,31 +81,30 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // 2. Only block the user and show auth errors if they are NOT on a public route
+  // Only block the user and show auth errors if they are NOT on a public route
   if (authError && !isPublicRoute) {
     if (authError.type === "user_not_registered") {
       return <UserNotRegisteredError />;
+    } else if (authError.type === "auth_required") {
+      navigateToLogin();
+      return null;
     }
   }
 
-  // Render the main app
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-      />
-      <Route path="/activate-account" element={<ActivateAccount />} />
+      {/* ========================================== */}
+      {/* PUBLIC ROUTES (No Sidebar, No Login Needed) */}
+      {/* ========================================== */}
+      <Route path="/jobs/:id" element={<PublicJobView />} />
 
-      <Route
-        element={
-          isAuthenticated ? <HRISLayout /> : <Navigate to="/login" replace />
-        }
-      >
+      {/* ========================================== */}
+      {/* PRIVATE ROUTES (Has Sidebar, Needs Login)    */}
+      {/* ========================================== */}
+      <Route element={<HRISLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/employees" element={<Employees />} />
         <Route path="/departments" element={<Departments />} />
-        <Route path="/project-sites" element={<ProjectSites />} />
         <Route path="/positions" element={<Positions />} />
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/tasks" element={<Tasks />} />
@@ -183,11 +184,6 @@ const AuthenticatedApp = () => {
 
         <Route path="*" element={<PageNotFound />} />
       </Route>
-
-      <Route
-        path="*"
-        element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />}
-      />
     </Routes>
   );
 };
@@ -197,7 +193,6 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          {/* We moved the logic to AppContent so we can use useLocation() safely inside the Router */}
           <AppContent />
         </Router>
         <Toaster />

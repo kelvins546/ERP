@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/api/base44Client";
-import { ChevronDown, Plus, Search, Edit, Trash2, Eye, Pin, PinOff, X } from "lucide-react";
+import {
+  ChevronDown,
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Eye,
+  Pin,
+  PinOff,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -67,7 +77,12 @@ function formatDelimitedLabel(value) {
 }
 
 function getDepartmentLabel(department) {
-  return department?.name || department?.department_name || department?.title || "Unnamed department";
+  return (
+    department?.name ||
+    department?.department_name ||
+    department?.title ||
+    "Unnamed department"
+  );
 }
 
 function formatSimpleTime(value) {
@@ -88,36 +103,47 @@ function getAnnouncementType(ann) {
 }
 
 function AnnouncementModal({ ann, onClose, onSaved, departments }) {
-  const initialTargetIds = splitDelimitedValues(ann?.target_department_id || ann?.target_department_ids);
-  const initialTargetNames = splitDelimitedValues(ann?.target_department_name || ann?.target_department_names);
+  const initialTargetIds = splitDelimitedValues(
+    ann?.target_department_id || ann?.target_department_ids,
+  );
+  const initialTargetNames = splitDelimitedValues(
+    ann?.target_department_name || ann?.target_department_names,
+  );
+
+  // FIX: Removed duplicate keys from the initial state
   const [form, setForm] = useState({
     title: "",
     content: "",
-    type: "informationals",
-    close_date: "",
-    close_time: "",
     is_pinned: false,
-    target_department_ids: [],
-    target_department_names: [],
     ...ann,
+    type: getAnnouncementType(ann),
+    close_date: toDateInputValue(
+      ann?.close_date || ann?.close_at || ann?.closeDate,
+    ),
+    close_time: toTimeInputValue(
+      ann?.close_time || ann?.close_at || ann?.closeTime,
+    ),
+    target_department_ids: initialTargetIds,
+    target_department_names: initialTargetNames,
   });
+
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
+    // FIX: Removed duplicate keys from the useEffect state reset
     setForm({
       title: "",
       content: "",
-      type: "informationals",
-      close_date: "",
-      close_time: "",
       is_pinned: false,
-      target_department_ids: [],
-      target_department_names: [],
       ...ann,
       type: getAnnouncementType(ann),
-      close_date: toDateInputValue(ann?.close_date || ann?.close_at || ann?.closeDate),
-      close_time: toTimeInputValue(ann?.close_time || ann?.close_at || ann?.closeTime),
+      close_date: toDateInputValue(
+        ann?.close_date || ann?.close_at || ann?.closeDate,
+      ),
+      close_time: toTimeInputValue(
+        ann?.close_time || ann?.close_at || ann?.closeTime,
+      ),
       target_department_ids: initialTargetIds,
       target_department_names: initialTargetNames,
     });
@@ -150,8 +176,12 @@ function AnnouncementModal({ ann, onClose, onSaved, departments }) {
         close_date: form.close_date,
         close_time: form.close_time,
         is_pinned: Boolean(form.is_pinned),
-        target_department_id: form.target_department_ids.length ? form.target_department_ids.join(",") : null,
-        target_department_name: form.target_department_names.length ? form.target_department_names.join(",") : null,
+        target_department_id: form.target_department_ids.length
+          ? form.target_department_ids.join(",")
+          : null,
+        target_department_name: form.target_department_names.length
+          ? form.target_department_names.join(",")
+          : null,
       };
 
       if (ann?.id) {
@@ -161,7 +191,9 @@ function AnnouncementModal({ ann, onClose, onSaved, departments }) {
           .eq("id", ann.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("announcements").insert([payload]);
+        const { error } = await supabase
+          .from("announcements")
+          .insert([payload]);
         if (error) throw error;
       }
 
@@ -194,33 +226,48 @@ function AnnouncementModal({ ann, onClose, onSaved, departments }) {
           )}
 
           <div>
-            <label className="text-xs font-medium text-slate-600">Title *</label>
+            <label className="text-xs font-medium text-slate-600">
+              Title *
+            </label>
             <Input
-              className={`mt-1 ${errors.title ? "border-red-500" : ""}`}
+              className={`mt-1 focus-visible:ring-[#2E6F40] ${errors.title ? "border-red-500" : ""}`}
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
               placeholder="Announcement title"
             />
-            {errors.title && <p className="mt-1 text-xs text-red-600">{errors.title}</p>}
+            {errors.title && (
+              <p className="mt-1 text-xs text-red-600">{errors.title}</p>
+            )}
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-600">Content *</label>
+            <label className="text-xs font-medium text-slate-600">
+              Content *
+            </label>
             <textarea
-              className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${errors.content ? "border-red-500" : "border-slate-200"}`}
+              className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E6F40] focus-visible:border-transparent ${errors.content ? "border-red-500" : "border-slate-200"}`}
               rows={5}
               value={form.content}
               onChange={(e) => set("content", e.target.value)}
               placeholder="Write the announcement details here"
             />
-            {errors.content && <p className="mt-1 text-xs text-red-600">{errors.content}</p>}
+            {errors.content && (
+              <p className="mt-1 text-xs text-red-600">{errors.content}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-600">Type *</label>
-              <Select value={form.type} onValueChange={(value) => set("type", value)}>
-                <SelectTrigger className={`mt-1 ${errors.type ? "border-red-500" : ""}`}>
+              <label className="text-xs font-medium text-slate-600">
+                Type *
+              </label>
+              <Select
+                value={form.type}
+                onValueChange={(value) => set("type", value)}
+              >
+                <SelectTrigger
+                  className={`mt-1 focus-visible:ring-[#2E6F40] ${errors.type ? "border-red-500" : ""}`}
+                >
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -231,16 +278,20 @@ function AnnouncementModal({ ann, onClose, onSaved, departments }) {
                   ))}
                 </SelectContent>
               </Select>
-              {errors.type && <p className="mt-1 text-xs text-red-600">{errors.type}</p>}
+              {errors.type && (
+                <p className="mt-1 text-xs text-red-600">{errors.type}</p>
+              )}
             </div>
 
             <div>
-              <label className="text-xs font-medium text-slate-600">Target Departments</label>
+              <label className="text-xs font-medium text-slate-600">
+                Target Departments
+              </label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                    className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E6F40]"
                   >
                     <span className="truncate text-left">
                       {form.target_department_ids.length === 0
@@ -268,15 +319,21 @@ function AnnouncementModal({ ann, onClose, onSaved, departments }) {
                     return (
                       <DropdownMenuCheckboxItem
                         key={department.id}
-                        checked={form.target_department_ids.includes(department.id)}
+                        checked={form.target_department_ids.includes(
+                          department.id,
+                        )}
                         onSelect={(event) => event.preventDefault()}
                         onCheckedChange={(checked) => {
                           const nextIds = checked
                             ? [...form.target_department_ids, department.id]
-                            : form.target_department_ids.filter((id) => id !== department.id);
+                            : form.target_department_ids.filter(
+                                (id) => id !== department.id,
+                              );
                           const nextNames = checked
                             ? [...form.target_department_names, departmentName]
-                            : form.target_department_names.filter((name) => name !== departmentName);
+                            : form.target_department_names.filter(
+                                (name) => name !== departmentName,
+                              );
                           set("target_department_ids", nextIds);
                           set("target_department_names", nextNames);
                         }}
@@ -295,25 +352,33 @@ function AnnouncementModal({ ann, onClose, onSaved, departments }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-600">Close Date *</label>
+              <label className="text-xs font-medium text-slate-600">
+                Close Date *
+              </label>
               <Input
                 type="date"
-                className={`mt-1 ${errors.close_date ? "border-red-500" : ""}`}
+                className={`mt-1 focus-visible:ring-[#2E6F40] ${errors.close_date ? "border-red-500" : ""}`}
                 value={form.close_date}
                 onChange={(e) => set("close_date", e.target.value)}
               />
-              {errors.close_date && <p className="mt-1 text-xs text-red-600">{errors.close_date}</p>}
+              {errors.close_date && (
+                <p className="mt-1 text-xs text-red-600">{errors.close_date}</p>
+              )}
             </div>
 
             <div>
-              <label className="text-xs font-medium text-slate-600">Close Time *</label>
+              <label className="text-xs font-medium text-slate-600">
+                Close Time *
+              </label>
               <Input
                 type="time"
-                className={`mt-1 ${errors.close_time ? "border-red-500" : ""}`}
+                className={`mt-1 focus-visible:ring-[#2E6F40] ${errors.close_time ? "border-red-500" : ""}`}
                 value={form.close_time}
                 onChange={(e) => set("close_time", e.target.value)}
               />
-              {errors.close_time && <p className="mt-1 text-xs text-red-600">{errors.close_time}</p>}
+              {errors.close_time && (
+                <p className="mt-1 text-xs text-red-600">{errors.close_time}</p>
+              )}
             </div>
           </div>
 
@@ -322,8 +387,11 @@ function AnnouncementModal({ ann, onClose, onSaved, departments }) {
               type="checkbox"
               checked={form.is_pinned || false}
               onChange={(e) => set("is_pinned", e.target.checked)}
+              className="rounded text-[#2E6F40] focus:ring-[#2E6F40]"
             />
-            <span className="text-sm text-slate-600">Pin this announcement</span>
+            <span className="text-sm text-slate-600">
+              Pin this announcement
+            </span>
           </label>
         </div>
 
@@ -331,7 +399,11 @@ function AnnouncementModal({ ann, onClose, onSaved, departments }) {
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={saving}>
+          <Button
+            onClick={save}
+            disabled={saving}
+            className="bg-[#2E6F40] hover:bg-[#235330] text-white"
+          >
             {saving ? "Saving..." : ann ? "Save Changes" : "Post"}
           </Button>
         </div>
@@ -345,9 +417,10 @@ function AnnouncementViewModal({ ann, onClose }) {
 
   const closeAt = ann.close_at || ann.close_date || null;
   const displayDate = closeAt ? new Date(closeAt) : null;
-  const closeLabel = displayDate && !Number.isNaN(displayDate.getTime())
-    ? displayDate.toLocaleString()
-    : "—";
+  const closeLabel =
+    displayDate && !Number.isNaN(displayDate.getTime())
+      ? displayDate.toLocaleString()
+      : "—";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -373,15 +446,19 @@ function AnnouncementViewModal({ ann, onClose }) {
             )}
             {ann.target_department_id && (
               <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
-                Department: {ann.target_department_name || ann.target_department_id}
+                Department:{" "}
+                {ann.target_department_name || ann.target_department_id}
               </span>
             )}
           </div>
 
           <div>
-            <h3 className="text-xl font-semibold text-slate-900">{ann.title}</h3>
+            <h3 className="text-xl font-semibold text-slate-900">
+              {ann.title}
+            </h3>
             <p className="text-xs text-slate-400 mt-1">
-              Posted: {ann.created_at ? new Date(ann.created_at).toLocaleString() : "—"}
+              Posted:{" "}
+              {ann.created_at ? new Date(ann.created_at).toLocaleString() : "—"}
             </p>
             <p className="text-xs text-slate-400 mt-1">Closes: {closeLabel}</p>
           </div>
@@ -394,23 +471,37 @@ function AnnouncementViewModal({ ann, onClose }) {
         </div>
 
         <div className="flex justify-end gap-3 p-5 border-t">
-          <Button onClick={onClose}>Close</Button>
+          <Button
+            onClick={onClose}
+            className="bg-[#2E6F40] hover:bg-[#235330] text-white"
+          >
+            Close
+          </Button>
         </div>
       </div>
     </div>
   );
 }
 
-function AnnouncementRow({ a, onView, onEdit, onDelete, onTogglePin, pinning }) {
+function AnnouncementRow({
+  a,
+  onView,
+  onEdit,
+  onDelete,
+  onTogglePin,
+  pinning,
+}) {
   const closeAt = a.close_at || a.close_date || null;
   const displayDate = closeAt ? new Date(closeAt) : null;
   const announcementType = getAnnouncementType(a);
-  const closeLabel = displayDate && !Number.isNaN(displayDate.getTime())
-    ? displayDate.toLocaleDateString()
-    : "—";
-  const closeTime = displayDate && !Number.isNaN(displayDate.getTime())
-    ? formatSimpleTime(a.close_time || displayDate.toTimeString().slice(0, 5))
-    : "—";
+  const closeLabel =
+    displayDate && !Number.isNaN(displayDate.getTime())
+      ? displayDate.toLocaleDateString()
+      : "—";
+  const closeTime =
+    displayDate && !Number.isNaN(displayDate.getTime())
+      ? formatSimpleTime(a.close_time || displayDate.toTimeString().slice(0, 5))
+      : "—";
   const targetDepartments = a.target_department_name || a.target_department_id;
 
   return (
@@ -443,27 +534,27 @@ function AnnouncementRow({ a, onView, onEdit, onDelete, onTogglePin, pinning }) 
       <td className="px-4 py-3">
         <div className="flex items-center gap-2 w-full">
           <div className="flex items-center gap-2">
-          <button
-            onClick={onView}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-            title="View full announcement"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onEdit}
-            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-            title="Edit announcement"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-            title="Delete announcement"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+            <button
+              onClick={onView}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+              title="View full announcement"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onEdit}
+              className="p-1.5 text-slate-400 hover:text-[#2E6F40] hover:bg-[#2E6F40]/10 rounded transition-colors"
+              title="Edit announcement"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+              title="Delete announcement"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
           <button
             onClick={onTogglePin}
@@ -471,7 +562,11 @@ function AnnouncementRow({ a, onView, onEdit, onDelete, onTogglePin, pinning }) 
             className={`ml-auto p-1.5 rounded transition-colors ${a.is_pinned ? "text-red-600 hover:text-red-700 hover:bg-red-50" : "text-red-500 hover:text-red-600 hover:bg-red-50"}`}
             title={a.is_pinned ? "Unpin announcement" : "Pin announcement"}
           >
-                  {a.is_pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+            {a.is_pinned ? (
+              <PinOff className="w-4 h-4" />
+            ) : (
+              <Pin className="w-4 h-4" />
+            )}
           </button>
         </div>
       </td>
@@ -503,11 +598,15 @@ export default function Announcements() {
           .from("announcements")
           .select("*")
           .order("created_at", { ascending: false }),
-        supabase.from("departments").select("id, name").order("name", { ascending: true }),
+        supabase
+          .from("departments")
+          .select("id, name")
+          .order("name", { ascending: true }),
       ]);
 
       const { data, error } = announcementsResult;
-      const { data: departmentData, error: departmentError } = departmentsResult;
+      const { data: departmentData, error: departmentError } =
+        departmentsResult;
 
       if (error) throw error;
       if (departmentError) throw departmentError;
@@ -528,7 +627,8 @@ export default function Announcements() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return items.filter((item) => {
-      const matchType = typeFilter === "all" ? true : getAnnouncementType(item) === typeFilter;
+      const matchType =
+        typeFilter === "all" ? true : getAnnouncementType(item) === typeFilter;
       const matchSearch =
         !term ||
         (item.title || "").toLowerCase().includes(term) ||
@@ -589,14 +689,16 @@ export default function Announcements() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Announcements</h1>
-          <p className="text-slate-500 text-sm">{items.length} total announcements</p>
+          <p className="text-slate-500 text-sm">
+            {items.length} total announcements
+          </p>
         </div>
         <Button
           onClick={() => {
             setEditItem(null);
             setShowModal(true);
           }}
-          className="gap-2"
+          className="bg-[#2E6F40] hover:bg-[#235330] text-white gap-2"
         >
           <Plus className="w-4 h-4" /> New Announcement
         </Button>
@@ -607,13 +709,13 @@ export default function Announcements() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             placeholder="Search announcements..."
-            className="pl-9 bg-white"
+            className="pl-9 bg-white focus-visible:ring-[#2E6F40]"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full sm:w-56 bg-white">
+          <SelectTrigger className="w-full sm:w-56 bg-white focus-visible:ring-[#2E6F40]">
             <SelectValue placeholder="Filter by type" />
           </SelectTrigger>
           <SelectContent>
@@ -629,7 +731,7 @@ export default function Announcements() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -664,7 +766,10 @@ export default function Announcements() {
               <tbody className="divide-y divide-slate-100">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-16 text-slate-400">
+                    <td
+                      colSpan={7}
+                      className="text-center py-16 text-slate-400"
+                    >
                       No announcements found.
                     </td>
                   </tr>
@@ -760,7 +865,9 @@ export default function Announcements() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pinCandidate?.is_pinned ? "Unpin Announcement" : "Pin Announcement"}
+              {pinCandidate?.is_pinned
+                ? "Unpin Announcement"
+                : "Pin Announcement"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pinCandidate?.is_pinned
@@ -769,7 +876,9 @@ export default function Announcements() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={Boolean(pinningId)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={Boolean(pinningId)}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (pinCandidate) {

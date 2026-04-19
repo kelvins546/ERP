@@ -96,7 +96,10 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
     const loadLookups = async () => {
       const [deptRes, siteRes, projectIdProbe] = await Promise.all([
         supabase.from("departments").select("id, name").order("name"),
-        supabase.from("project_sites").select("id, name, location").order("name"),
+        supabase
+          .from("project_sites")
+          .select("id, name, location")
+          .order("name"),
         supabase.from("employees").select("project_site_id").limit(1),
       ]);
 
@@ -158,13 +161,19 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
       if (!projectIdProbe.error) {
         setProjectSiteLinkMode("id");
       } else {
-        const projectNameProbe = await supabase.from("employees").select("project_site_name").limit(1);
+        const projectNameProbe = await supabase
+          .from("employees")
+          .select("project_site_name")
+          .limit(1);
         setProjectSiteLinkMode(projectNameProbe.error ? "none" : "name");
       }
 
       let linkTable = null;
       for (const tableName of POSITION_LINK_TABLE_CANDIDATES) {
-        const probe = await supabase.from(tableName).select("employee_id, position_id").limit(1);
+        const probe = await supabase
+          .from(tableName)
+          .select("employee_id, position_id")
+          .limit(1);
         if (!probe.error) {
           linkTable = tableName;
           break;
@@ -221,11 +230,13 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
   const validateForm = (f) => {
     const next = {};
 
-    if (!f.employee_code?.trim()) next.employee_code = "Employee code is required.";
+    if (!f.employee_code?.trim())
+      next.employee_code = "Employee code is required.";
     if (!f.first_name?.trim()) next.first_name = "First name is required.";
     if (!f.last_name?.trim()) next.last_name = "Last name is required.";
     if (!f.status?.trim()) next.status = "Employment status is required.";
-    if (!isEditing && !f.email?.trim()) next.email = "Email is required for activation invite.";
+    if (!isEditing && !f.email?.trim())
+      next.email = "Email is required for activation invite.";
     if (f.email && !isValidEmail(f.email)) next.email = "Enter a valid email.";
 
     const phoneError = validatePhone(f.phone);
@@ -235,7 +246,8 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
       next.emergency_contact_phone = "Emergency contact phone is required.";
     } else {
       const emergencyPhoneError = validatePhone(f.emergency_contact_phone);
-      if (emergencyPhoneError) next.emergency_contact_phone = emergencyPhoneError;
+      if (emergencyPhoneError)
+        next.emergency_contact_phone = emergencyPhoneError;
     }
 
     Object.keys(GOVERNMENT_ID_RULES).forEach((key) => {
@@ -247,7 +259,8 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
       const selected = new Date(f.hire_date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (selected > today) next.hire_date = "Hire date cannot be in the future.";
+      if (selected > today)
+        next.hire_date = "Hire date cannot be in the future.";
     }
 
     return next;
@@ -261,7 +274,9 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
     }
 
     if (GOVERNMENT_ID_RULES[key]) {
-      value = String(rawValue || "").replace(/\D/g, "").slice(0, 12);
+      value = String(rawValue || "")
+        .replace(/\D/g, "")
+        .slice(0, 12);
     }
 
     setForm((prev) => {
@@ -278,17 +293,27 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
     return JSON.stringify(form) !== JSON.stringify(cleanForm);
   }, [form, cleanForm]);
 
-  const selectedProjectSiteValue = projectSiteLinkMode === "id" ? form.project_site_id : form.project_site_name;
+  const selectedProjectSiteValue =
+    projectSiteLinkMode === "id"
+      ? form.project_site_id
+      : form.project_site_name;
   const hasProjectSiteSelection = Boolean(selectedProjectSiteValue);
-  const hasDepartmentSelection = Boolean(form.department_id || form.department_name);
+  const hasDepartmentSelection = Boolean(
+    form.department_id || form.department_name,
+  );
 
   const selectedDepartmentName =
-    departments.find((dept) => String(dept.id) === String(form.department_id))?.name || form.department_name || "";
+    departments.find((dept) => String(dept.id) === String(form.department_id))
+      ?.name ||
+    form.department_name ||
+    "";
 
   const filteredPositions = useMemo(() => {
     if (!hasDepartmentSelection) return [];
 
-    const normalizedDepartmentName = selectedDepartmentName.trim().toLowerCase();
+    const normalizedDepartmentName = selectedDepartmentName
+      .trim()
+      .toLowerCase();
     const hasDepartmentMapping = positions.some(
       (position) => position?.department_id || position?.department_name,
     );
@@ -298,20 +323,29 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
     if (!hasDepartmentMapping) return positions;
 
     const matches = positions.filter((position) => {
-      const depId = position.department_id ? String(position.department_id) : "";
+      const depId = position.department_id
+        ? String(position.department_id)
+        : "";
       const depName = position.department_name
         ? String(position.department_name).trim().toLowerCase()
         : "";
 
-      if (form.department_id && depId) return String(form.department_id) === depId;
-      if (normalizedDepartmentName && depName) return normalizedDepartmentName === depName;
+      if (form.department_id && depId)
+        return String(form.department_id) === depId;
+      if (normalizedDepartmentName && depName)
+        return normalizedDepartmentName === depName;
       return false;
     });
 
     // If department mapping exists but this department has no direct match,
     // fall back to all positions so users can still proceed.
     return matches.length > 0 ? matches : positions;
-  }, [positions, hasDepartmentSelection, form.department_id, selectedDepartmentName]);
+  }, [
+    positions,
+    hasDepartmentSelection,
+    form.department_id,
+    selectedDepartmentName,
+  ]);
 
   const selectedPositionLabels = positions
     .filter((position) => selectedPositionIds.includes(String(position.id)))
@@ -328,7 +362,9 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
   const persistEmployee = async () => {
     setSaving(true);
     try {
-      const primaryPositionId = !isEditing ? selectedPositionIds[0] || normalize(form.position_id) : normalize(form.position_id);
+      const primaryPositionId = !isEditing
+        ? selectedPositionIds[0] || normalize(form.position_id)
+        : normalize(form.position_id);
 
       const payload = {
         employee_code: normalize(form.employee_code),
@@ -350,11 +386,16 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
         emergency_contact_phone: normalize(form.emergency_contact_phone),
       };
 
-      if (projectSiteLinkMode === "id") payload.project_site_id = normalize(form.project_site_id);
-      if (projectSiteLinkMode === "name") payload.project_site_name = normalize(form.project_site_name);
+      if (projectSiteLinkMode === "id")
+        payload.project_site_id = normalize(form.project_site_id);
+      if (projectSiteLinkMode === "name")
+        payload.project_site_name = normalize(form.project_site_name);
 
       if (employee?.id) {
-        const { error } = await supabase.from("employees").update(payload).eq("id", employee.id);
+        const { error } = await supabase
+          .from("employees")
+          .update(payload)
+          .eq("id", employee.id);
         if (error) throw error;
       } else {
         const { data: insertedEmployee, error } = await supabase
@@ -364,21 +405,47 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
           .single();
         if (error) throw error;
 
-        if (multiPositionMode && positionLinkTable && insertedEmployee?.id && selectedPositionIds.length > 0) {
-          const rows = selectedPositionIds.map((positionId) => ({ employee_id: insertedEmployee.id, position_id: positionId }));
-          const { error: positionErr } = await supabase.from(positionLinkTable).insert(rows);
+        if (
+          multiPositionMode &&
+          positionLinkTable &&
+          insertedEmployee?.id &&
+          selectedPositionIds.length > 0
+        ) {
+          const rows = selectedPositionIds.map((positionId) => ({
+            employee_id: insertedEmployee.id,
+            position_id: positionId,
+          }));
+          const { error: positionErr } = await supabase
+            .from(positionLinkTable)
+            .insert(rows);
           if (positionErr) throw positionErr;
         }
 
-        if (!payload.email) throw new Error("Employee email is required to send activation link.");
+        if (!payload.email)
+          throw new Error(
+            "Employee email is required to send activation link.",
+          );
 
         try {
-          const displayName = ((payload.first_name || "") + " " + (payload.last_name || "")).trim();
-          const roleLabel = positions.find((position) => String(position.id) === String(payload.position_id))?.title || "Employee";
-          const departmentLabel = departments.find((dept) => String(dept.id) === String(payload.department_id))?.name || "";
-          const siteLabel = projectSiteLinkMode === "id"
-            ? projectSites.find((site) => String(site.id) === String(payload.project_site_id))?.name || ""
-            : payload.project_site_name || "";
+          const displayName = (
+            (payload.first_name || "") +
+            " " +
+            (payload.last_name || "")
+          ).trim();
+          const roleLabel =
+            positions.find(
+              (position) => String(position.id) === String(payload.position_id),
+            )?.title || "Employee";
+          const departmentLabel =
+            departments.find(
+              (dept) => String(dept.id) === String(payload.department_id),
+            )?.name || "";
+          const siteLabel =
+            projectSiteLinkMode === "id"
+              ? projectSites.find(
+                  (site) => String(site.id) === String(payload.project_site_id),
+                )?.name || ""
+              : payload.project_site_name || "";
 
           await createEmployeeInviteAndSendEmail({
             employeeId: insertedEmployee.id,
@@ -391,9 +458,15 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
           });
         } catch (inviteError) {
           if (multiPositionMode && positionLinkTable) {
-            await supabase.from(positionLinkTable).delete().eq("employee_id", insertedEmployee.id);
+            await supabase
+              .from(positionLinkTable)
+              .delete()
+              .eq("employee_id", insertedEmployee.id);
           }
-          await supabase.from("employees").delete().eq("id", insertedEmployee.id);
+          await supabase
+            .from("employees")
+            .delete()
+            .eq("id", insertedEmployee.id);
           throw inviteError;
         }
       }
@@ -402,7 +475,10 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
     } catch (error) {
       console.error("Failed to save employee:", error.message);
       if (error.code === "23505") {
-        setErrors((prev) => ({ ...prev, employee_code: "Employee code already exists." }));
+        setErrors((prev) => ({
+          ...prev,
+          employee_code: "Employee code already exists.",
+        }));
       } else {
         alert("Failed to save employee: " + error.message);
       }
@@ -433,8 +509,15 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b">
-          <h2 className="text-lg font-semibold">{isEditing ? "Edit Employee" : "Add Employee"}</h2>
-          <button type="button" onClick={() => (hasUnsavedChanges ? setShowCloseConfirm(true) : onClose())}>
+          <h2 className="text-lg font-semibold">
+            {isEditing ? "Edit Employee" : "Add Employee"}
+          </h2>
+          <button
+            type="button"
+            onClick={() =>
+              hasUnsavedChanges ? setShowCloseConfirm(true) : onClose()
+            }
+          >
             <X className="w-5 h-5 text-slate-400 hover:text-slate-700" />
           </button>
         </div>
@@ -444,46 +527,75 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
             {fields.map((field) => (
               <div key={field.key}>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  {field.label}{field.required ? " *" : ""}
+                  {field.label}
+                  {field.required ? " *" : ""}
                 </label>
                 <Input
                   type={field.type || "text"}
                   value={form[field.key] || ""}
                   placeholder={field.label}
                   onChange={(e) => setValue(field.key, e.target.value)}
-                  onBlur={() => setTouched((prev) => ({ ...prev, [field.key]: true }))}
+                  onBlur={() =>
+                    setTouched((prev) => ({ ...prev, [field.key]: true }))
+                  }
                   inputMode={
-                    field.key === "phone" || field.key === "emergency_contact_phone" || GOVERNMENT_ID_RULES[field.key]
+                    field.key === "phone" ||
+                    field.key === "emergency_contact_phone" ||
+                    GOVERNMENT_ID_RULES[field.key]
                       ? "numeric"
                       : undefined
                   }
-                  className={showError(field.key) ? "border-red-400 focus-visible:ring-red-400" : ""}
+                  className={
+                    showError(field.key)
+                      ? "border-red-400 focus-visible:ring-red-400"
+                      : ""
+                  }
                 />
-                {showError(field.key) ? <p className="mt-1 text-xs text-red-600">{errors[field.key]}</p> : null}
+                {showError(field.key) ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {errors[field.key]}
+                  </p>
+                ) : null}
               </div>
             ))}
 
             {!isEditing ? (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Project Site (Optional)</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Project Site (Optional)
+                  </label>
                   {projectSiteLinkMode === "none" ? (
                     <div className="w-full border border-dashed border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-500">
-                      Project site column is not available in the employees table.
+                      Project site column is not available in the employees
+                      table.
                     </div>
                   ) : (
                     <Select
-                      value={String(projectSiteLinkMode === "id" ? form.project_site_id || "" : form.project_site_name || "")}
+                      value={String(
+                        projectSiteLinkMode === "id"
+                          ? form.project_site_id || ""
+                          : form.project_site_name || "",
+                      )}
                       onValueChange={(value) => {
                         setForm((prev) => ({
                           ...prev,
-                          project_site_id: projectSiteLinkMode === "id" ? value : prev.project_site_id,
-                          project_site_name: projectSiteLinkMode === "name" ? value : prev.project_site_name,
+                          project_site_id:
+                            projectSiteLinkMode === "id"
+                              ? value
+                              : prev.project_site_id,
+                          project_site_name:
+                            projectSiteLinkMode === "name"
+                              ? value
+                              : prev.project_site_name,
                           department_id: "",
                           position_id: "",
                         }));
                         setSelectedPositionIds([]);
-                        setTouched((prev) => ({ ...prev, project_site_id: true }));
+                        setTouched((prev) => ({
+                          ...prev,
+                          project_site_id: true,
+                        }));
                       }}
                     >
                       <SelectTrigger className="w-full bg-white">
@@ -491,8 +603,16 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
                       </SelectTrigger>
                       <SelectContent>
                         {projectSites.map((site) => (
-                          <SelectItem key={site.id} value={String(projectSiteLinkMode === "id" ? site.id : site.name)}>
-                            {site.name}{site.location ? " - " + site.location : ""}
+                          <SelectItem
+                            key={site.id}
+                            value={String(
+                              projectSiteLinkMode === "id"
+                                ? site.id
+                                : site.name,
+                            )}
+                          >
+                            {site.name}
+                            {site.location ? " - " + site.location : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -501,29 +621,45 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Department (Optional)</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Department (Optional)
+                  </label>
                   <Select
                     value={String(form.department_id || "")}
                     disabled={!hasProjectSiteSelection}
                     onValueChange={(departmentId) => {
-                      setForm((prev) => ({ ...prev, department_id: departmentId, position_id: "" }));
+                      setForm((prev) => ({
+                        ...prev,
+                        department_id: departmentId,
+                        position_id: "",
+                      }));
                       setSelectedPositionIds([]);
                       setTouched((prev) => ({ ...prev, department_id: true }));
                     }}
                   >
                     <SelectTrigger className="w-full bg-white disabled:bg-slate-100 disabled:text-slate-400">
-                      <SelectValue placeholder={hasProjectSiteSelection ? "Select department" : "Select project site first"} />
+                      <SelectValue
+                        placeholder={
+                          hasProjectSiteSelection
+                            ? "Select department"
+                            : "Select project site first"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
+                        <SelectItem key={dept.id} value={String(dept.id)}>
+                          {dept.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Positions (Optional)</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Positions (Optional)
+                  </label>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -543,7 +679,9 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-72 overflow-y-auto p-1">
                       {filteredPositions.length === 0 ? (
-                        <div className="px-2 py-1 text-xs text-slate-500">No positions found for selected department.</div>
+                        <div className="px-2 py-1 text-xs text-slate-500">
+                          No positions found for selected department.
+                        </div>
                       ) : (
                         filteredPositions.map((position) => {
                           const id = String(position.id);
@@ -555,10 +693,18 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
                               onCheckedChange={(checked) => {
                                 const next = checked
                                   ? [...selectedPositionIds, id]
-                                  : selectedPositionIds.filter((value) => value !== id);
+                                  : selectedPositionIds.filter(
+                                      (value) => value !== id,
+                                    );
                                 setSelectedPositionIds(next);
-                                setForm((prev) => ({ ...prev, position_id: next[0] || "" }));
-                                setTouched((prev) => ({ ...prev, position_id: true }));
+                                setForm((prev) => ({
+                                  ...prev,
+                                  position_id: next[0] || "",
+                                }));
+                                setTouched((prev) => ({
+                                  ...prev,
+                                  position_id: true,
+                                }));
                               }}
                             >
                               {position.title}
@@ -576,7 +722,9 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Employment Status *</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Employment Status *
+                  </label>
                   <Select
                     value={form.status}
                     onValueChange={(value) => {
@@ -584,18 +732,33 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
                       setTouched((prev) => ({ ...prev, status: true }));
                     }}
                   >
-                    <SelectTrigger className={"w-full bg-white " + (showError("status") ? "border-red-400" : "border-slate-200")}>
+                    <SelectTrigger
+                      className={
+                        "w-full bg-white " +
+                        (showError("status")
+                          ? "border-red-400"
+                          : "border-slate-200")
+                      }
+                    >
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {["probationary", "regular", "contractual", "resigned", "terminated"].map((status) => (
+                      {[
+                        "probationary",
+                        "regular",
+                        "contractual",
+                        "resigned",
+                        "terminated",
+                      ].map((status) => (
                         <SelectItem key={status} value={status}>
                           {status.charAt(0).toUpperCase() + status.slice(1)}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {showError("status") ? <p className="mt-1 text-xs text-red-600">{errors.status}</p> : null}
+                  {showError("status") ? (
+                    <p className="mt-1 text-xs text-red-600">{errors.status}</p>
+                  ) : null}
                 </div>
               </>
             ) : null}
@@ -603,15 +766,26 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
         </div>
 
         <div className="flex justify-end gap-3 p-5 border-t">
-          <Button variant="outline" onClick={() => (hasUnsavedChanges ? setShowCloseConfirm(true) : onClose())}>Cancel</Button>
-          <Button onClick={requestSaveConfirmation} disabled={saving}>{saving ? "Saving..." : "Save Employee"}</Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              hasUnsavedChanges ? setShowCloseConfirm(true) : onClose()
+            }
+          >
+            Cancel
+          </Button>
+          <Button onClick={requestSaveConfirmation} disabled={saving}>
+            {saving ? "Saving..." : "Save Employee"}
+          </Button>
         </div>
       </div>
 
       <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{isEditing ? "Confirm Employee Update" : "Confirm New Employee"}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isEditing ? "Confirm Employee Update" : "Confirm New Employee"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {isEditing
                 ? "Are you sure the edited employee information is correct?"
@@ -619,9 +793,15 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Review Details</AlertDialogCancel>
+            <AlertDialogCancel disabled={saving}>
+              Review Details
+            </AlertDialogCancel>
             <AlertDialogAction onClick={persistEmployee} disabled={saving}>
-              {saving ? "Saving..." : isEditing ? "Confirm Update" : "Confirm Add"}
+              {saving
+                ? "Saving..."
+                : isEditing
+                  ? "Confirm Update"
+                  : "Confirm Add"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -632,12 +812,16 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Discard Changes?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes. Are you sure you want to close without saving?
+              You have unsaved changes. Are you sure you want to close without
+              saving?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Continue Editing</AlertDialogCancel>
-            <AlertDialogAction onClick={onClose} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction
+              onClick={onClose}
+              className="bg-red-600 hover:bg-red-700"
+            >
               Discard Changes
             </AlertDialogAction>
           </AlertDialogFooter>

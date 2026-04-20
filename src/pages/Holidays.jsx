@@ -16,6 +16,7 @@ function HolidayModal({ holiday, onClose, onSaved }) {
     name: "",
     date: "",
     type: "regular",
+    pay_rate_multiplier: 1,
     ...holiday,
   });
 
@@ -30,6 +31,7 @@ function HolidayModal({ holiday, onClose, onSaved }) {
         name: form.name,
         date: form.date,
         type: form.type,
+        pay_rate_multiplier: Number(form.pay_rate_multiplier),
       };
 
       if (holiday?.id) {
@@ -97,12 +99,35 @@ function HolidayModal({ holiday, onClose, onSaved }) {
               <option value="special_working">Special Working</option>
             </select>
           </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600">
+              Pay Rate Multiplier *
+            </label>
+            <Input
+              className="mt-1"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.pay_rate_multiplier ?? ""}
+              onChange={(e) => set("pay_rate_multiplier", e.target.value)}
+              placeholder="e.g. 2.0"
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-3 p-5 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={saving || !form.name || !form.date}>
+          <Button
+            onClick={save}
+            disabled={
+              saving ||
+              !form.name ||
+              !form.date ||
+              form.pay_rate_multiplier === "" ||
+              Number(form.pay_rate_multiplier) <= 0
+            }
+          >
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>
@@ -178,7 +203,7 @@ export default function Holidays() {
           <table className="w-full">
             <thead className="bg-slate-50 border-b">
               <tr>
-                {["Date", "Holiday", "Type", "Actions"].map((h) => (
+                {["Date", "Holiday", "Type", "Pay Multiplier", "Actions"].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase"
@@ -191,7 +216,7 @@ export default function Holidays() {
             <tbody className="divide-y divide-slate-100">
               {holidays.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-12 text-slate-400">
+                  <td colSpan={5} className="text-center py-12 text-slate-400">
                     No holidays configured.
                   </td>
                 </tr>
@@ -218,6 +243,9 @@ export default function Holidays() {
                       >
                         {(h.type || "").replace(/_/g, " ")}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-800">
+                      {Number(h.pay_rate_multiplier || 0).toFixed(2)}x
                     </td>
                     <td className="px-4 py-3 flex gap-2">
                       <button

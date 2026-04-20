@@ -6,6 +6,10 @@
       "type": "string",
       "title": "Schedule Name"
     },
+    "description": {
+      "type": "string",
+      "title": "Description"
+    },
     "expected_time_in": {
       "type": "string",
       "title": "Expected Time In"
@@ -14,9 +18,24 @@
       "type": "string",
       "title": "Expected Time Out"
     },
+    "break_periods": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "title": "Break Periods"
+    },
     "grace_period_mins": {
       "type": "number",
       "title": "Grace Period (minutes)"
+    },
+    "total_hours": {
+      "type": "number",
+      "title": "Total Hours"
+    },
+    "required_hours": {
+      "type": "number",
+      "title": "Required Hours"
     },
     "work_days": {
       "type": "array",

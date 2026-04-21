@@ -283,6 +283,7 @@ function ScheduleModal({ schedule, onClose, onSaved }) {
 export default function Schedules() {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editSchedule, setEditSchedule] = useState(null);
 
@@ -320,6 +321,22 @@ export default function Schedules() {
     }
   };
 
+  const filteredSchedules = schedules.filter((schedule) => {
+    if (!search) return true;
+    const haystack = [
+      schedule.name,
+      schedule.description,
+      schedule.expected_time_in,
+      schedule.expected_time_out,
+      schedule.required_hours,
+      (schedule.work_days || []).join(" "),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(search.toLowerCase());
+  });
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -336,6 +353,14 @@ export default function Schedules() {
         >
           <Plus className="w-4 h-4" /> New Schedule
         </Button>
+      </div>
+
+      <div className="w-full max-w-sm">
+        <Input
+          placeholder="Search schedules..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
       </div>
 
       {loading ? (
@@ -368,14 +393,14 @@ export default function Schedules() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {schedules.length === 0 ? (
+                {filteredSchedules.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center py-12 text-slate-400">
                       No schedules configured yet.
                     </td>
                   </tr>
                 ) : (
-                  schedules.map((schedule) => {
+                  filteredSchedules.map((schedule) => {
                     return (
                       <tr key={schedule.id} className="hover:bg-slate-50 align-top">
                         <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">

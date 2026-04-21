@@ -140,6 +140,7 @@ function HolidayModal({ holiday, onClose, onSaved }) {
 export default function Holidays() {
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editHoliday, setEditHoliday] = useState(null);
 
@@ -179,6 +180,20 @@ export default function Holidays() {
     }
   };
 
+  const filteredHolidays = holidays.filter((holiday) => {
+    if (!search) return true;
+    const haystack = [
+      holiday.name,
+      holiday.date,
+      holiday.type,
+      holiday.pay_rate_multiplier,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(search.toLowerCase());
+  });
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -192,6 +207,14 @@ export default function Holidays() {
         >
           <Plus className="w-4 h-4" /> Add Holiday
         </Button>
+      </div>
+
+      <div className="w-full max-w-sm">
+        <Input
+          placeholder="Search holidays..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
       </div>
 
       {loading ? (
@@ -214,14 +237,14 @@ export default function Holidays() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {holidays.length === 0 ? (
+              {filteredHolidays.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-12 text-slate-400">
                     No holidays configured.
                   </td>
                 </tr>
               ) : (
-                holidays.map((h) => (
+                filteredHolidays.map((h) => (
                   <tr
                     key={h.id}
                     className="hover:bg-slate-50 transition-colors"

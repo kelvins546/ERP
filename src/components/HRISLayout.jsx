@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
@@ -257,8 +257,24 @@ export default function HRISLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+
+  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email || "User";
+  const displayRole = user?.role || "Employee";
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -345,10 +361,36 @@ export default function HRISLayout() {
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-3 ml-auto">
+            <div className="hidden sm:flex flex-col items-end leading-tight mr-1">
+              <p className="text-sm font-semibold text-slate-900">
+                {new Intl.DateTimeFormat(undefined, {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }).format(now)}
+              </p>
+              <p className="text-xs text-slate-500">
+                {new Intl.DateTimeFormat(undefined, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  second: "2-digit",
+                }).format(now)}
+              </p>
+            </div>
             <button className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#2E6F40] rounded-full"></span>
             </button>
+            <div className="hidden sm:flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2E6F40] text-sm font-bold text-white">
+                {initials || "U"}
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold text-slate-900">{displayName}</p>
+                <p className="text-xs text-slate-500 capitalize">{displayRole}</p>
+              </div>
+            </div>
           </div>
         </header>
 

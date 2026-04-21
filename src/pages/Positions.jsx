@@ -14,6 +14,64 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// 2026 Third Tranche Monthly Salary Schedule (NG Civilian Personnel)
+// Range per SG is based on step 1 (min) and step 8 (max).
+const SALARY_GRADE_2026_RANGES = [
+  { grade: 1, min: 14634, max: 15456 },
+  { grade: 2, min: 15522, max: 16342 },
+  { grade: 3, min: 16486, max: 17360 },
+  { grade: 4, min: 17506, max: 18433 },
+  { grade: 5, min: 18581, max: 19565 },
+  { grade: 6, min: 19716, max: 20761 },
+  { grade: 7, min: 20914, max: 22022 },
+  { grade: 8, min: 22423, max: 23883 },
+  { grade: 9, min: 24329, max: 25725 },
+  { grade: 10, min: 26917, max: 28456 },
+  { grade: 11, min: 31705, max: 33611 },
+  { grade: 12, min: 33947, max: 35850 },
+  { grade: 13, min: 36125, max: 38241 },
+  { grade: 14, min: 38764, max: 41503 },
+  { grade: 15, min: 42178, max: 45202 },
+  { grade: 16, min: 45694, max: 49020 },
+  { grade: 17, min: 49562, max: 53221 },
+  { grade: 18, min: 53818, max: 57842 },
+  { grade: 19, min: 59153, max: 65132 },
+  { grade: 20, min: 66052, max: 72671 },
+  { grade: 21, min: 73303, max: 80831 },
+  { grade: 22, min: 81796, max: 90295 },
+  { grade: 23, min: 91306, max: 99883 },
+];
+
+const inferSalaryGrade2026 = (minSalary, maxSalary) => {
+  const min = Number(minSalary);
+  const max = Number(maxSalary);
+
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max <= 0 || min > max) {
+    return "";
+  }
+
+  const exactRangeMatch = SALARY_GRADE_2026_RANGES.find(
+    (entry) => min >= entry.min && max <= entry.max,
+  );
+  if (exactRangeMatch) return `SG-${exactRangeMatch.grade}`;
+
+  // Fallback: choose nearest midpoint when min/max does not exactly fit one SG band.
+  const midpoint = (min + max) / 2;
+  let nearest = SALARY_GRADE_2026_RANGES[0];
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  for (const entry of SALARY_GRADE_2026_RANGES) {
+    const entryMidpoint = (entry.min + entry.max) / 2;
+    const distance = Math.abs(entryMidpoint - midpoint);
+    if (distance < nearestDistance) {
+      nearest = entry;
+      nearestDistance = distance;
+    }
+  }
+
+  return `SG-${nearest.grade}`;
+};
+
 function PosModal({
   pos,
   onClose,
@@ -78,6 +136,13 @@ function PosModal({
   const set = (key, value) => {
     setForm((prev) => {
       const nextForm = { ...prev, [key]: value };
+
+      if (key === "base_salary_min" || key === "base_salary_max") {
+        const nextMin = key === "base_salary_min" ? value : nextForm.base_salary_min;
+        const nextMax = key === "base_salary_max" ? value : nextForm.base_salary_max;
+        nextForm.salary_grade = inferSalaryGrade2026(nextMin, nextMax);
+      }
+
       setErrors(validateForm(nextForm));
       return nextForm;
     });
@@ -108,6 +173,12 @@ function PosModal({
       department_name: "",
       ...pos,
     };
+
+    if (nextForm.base_salary_min && nextForm.base_salary_max) {
+      nextForm.salary_grade =
+        inferSalaryGrade2026(nextForm.base_salary_min, nextForm.base_salary_max) ||
+        nextForm.salary_grade;
+    }
 
     setForm(nextForm);
     setCleanForm(nextForm);
@@ -262,16 +333,6 @@ function PosModal({
             )}
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-slate-600">Salary Grade</label>
-            <Input
-              className="mt-1"
-              value={form.salary_grade || ""}
-              onChange={(e) => set("salary_grade", e.target.value)}
-              placeholder="e.g. SG-1"
-            />
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600">Min Salary (PHP)</label>
@@ -295,6 +356,20 @@ function PosModal({
           {showError("salary_range") && (
             <p className="text-xs text-red-600">{errors.salary_range}</p>
           )}
+
+          <div>
+            <label className="text-xs font-medium text-slate-600">Salary Grade</label>
+            <Input
+              className="mt-1 bg-slate-50 text-slate-700"
+              value={form.salary_grade || ""}
+              readOnly
+              disabled
+              placeholder="Auto-computed"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Automatically computed from minimum and maximum salary.
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 p-5 border-t">

@@ -6,10 +6,13 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import PageNotFound from "./lib/PageNotFound";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
+import PageAccessRoute from "@/components/PageAccessRoute";
+import Login from "./pages/Login";
 import HRISLayout from "./components/HRISLayout";
 import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
@@ -66,12 +69,13 @@ import AccountsPayable from "./features/accounting/pages/AccountsPayable";
 import PublicJobView from "./pages/PublicJobView";
 
 const AppContent = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } =
+  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated } =
     useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Detect if the user is on a public page (like a job posting) so we don't block them
-  const isPublicRoute = location.pathname.startsWith("/jobs/");
+  const isPublicRoute = location.pathname.startsWith("/jobs/") || location.pathname === "/login";
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -82,13 +86,18 @@ const AppContent = () => {
     );
   }
 
-  // Only block the user and show auth errors if they are NOT on a public route
+  // If not authenticated and not on a public route, redirect to login
+  if (!isAuthenticated && !isPublicRoute) {
+    navigate("/login", { replace: true });
+    return null;
+  }
+
+  // Only show auth errors if they are NOT on a public route
   if (authError && !isPublicRoute) {
     if (authError.type === "user_not_registered") {
       return <UserNotRegisteredError />;
-    } else if (authError.type === "auth_required") {
-      navigateToLogin();
-      return null;
+    } else if (authError.type === "account_deactivated") {
+      return <UserNotRegisteredError />;
     }
   }
 
@@ -97,94 +106,97 @@ const AppContent = () => {
       {/* ========================================== */}
       {/* PUBLIC ROUTES (No Sidebar, No Login Needed) */}
       {/* ========================================== */}
+      <Route path="/login" element={<Login />} />
       <Route path="/jobs/:id" element={<PublicJobView />} />
 
       {/* ========================================== */}
       {/* PRIVATE ROUTES (Has Sidebar, Needs Login)    */}
       {/* ========================================== */}
-      <Route element={<HRISLayout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/employees" element={<Employees />} />
-        <Route path="/departments" element={<Departments />} />
-        <Route path="/positions" element={<Positions />} />
-        <Route path="/project-sites" element={<ProjectSites />} />
-        <Route path="/announcements" element={<Announcements />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/documents" element={<Documents />} />
-        <Route path="/org-chart" element={<OrgChart />} />
-        <Route path="/job-postings" element={<JobPostings />} />
-        <Route path="/applicants" element={<Applicants />} />
-        <Route path="/interviews" element={<Interviews />} />
-        <Route path="/job-offers" element={<JobOffers />} />
-        <Route path="/attendance" element={<Attendance />} />
-        <Route path="/leaves" element={<Leaves />} />
-        <Route path="/overtime" element={<Overtime />} />
-        <Route path="/holidays" element={<Holidays />} />
-        <Route path="/schedules" element={<Schedules />} />
-        <Route path="/payroll" element={<Payroll />} />
-        <Route path="/payslips" element={<Payslips />} />
-        <Route path="/salary-profiles" element={<SalaryProfiles />} />
-        <Route path="/allowances" element={<Allowances />} />
-        <Route path="/loans" element={<Loans />} />
-        <Route path="/evaluations" element={<Evaluations />} />
-        <Route path="/kpi" element={<KPI />} />
-        <Route path="/disciplinary" element={<Disciplinary />} />
-        <Route path="/promotions" element={<Promotions />} />
+      <Route element={<PageAccessRoute />}>
+        <Route element={<HRISLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/employees" element={<Employees />} />
+          <Route path="/departments" element={<Departments />} />
+          <Route path="/positions" element={<Positions />} />
+          <Route path="/project-sites" element={<ProjectSites />} />
+          <Route path="/announcements" element={<Announcements />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route path="/documents" element={<Documents />} />
+          <Route path="/org-chart" element={<OrgChart />} />
+          <Route path="/job-postings" element={<JobPostings />} />
+          <Route path="/applicants" element={<Applicants />} />
+          <Route path="/interviews" element={<Interviews />} />
+          <Route path="/job-offers" element={<JobOffers />} />
+          <Route path="/attendance" element={<Attendance />} />
+          <Route path="/leaves" element={<Leaves />} />
+          <Route path="/overtime" element={<Overtime />} />
+          <Route path="/holidays" element={<Holidays />} />
+          <Route path="/schedules" element={<Schedules />} />
+          <Route path="/payroll" element={<Payroll />} />
+          <Route path="/payslips" element={<Payslips />} />
+          <Route path="/salary-profiles" element={<SalaryProfiles />} />
+          <Route path="/allowances" element={<Allowances />} />
+          <Route path="/loans" element={<Loans />} />
+          <Route path="/evaluations" element={<Evaluations />} />
+          <Route path="/kpi" element={<KPI />} />
+          <Route path="/disciplinary" element={<Disciplinary />} />
+          <Route path="/promotions" element={<Promotions />} />
 
-        {/* Support for both the old nested paths and the new query param paths for Reports */}
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/reports/headcount" element={<Reports />} />
-        <Route path="/reports/leaves" element={<Reports />} />
-        <Route path="/reports/payroll" element={<Reports />} />
-        <Route path="/reports/attrition" element={<Reports />} />
+          {/* Support for both the old nested paths and the new query param paths for Reports */}
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/reports/headcount" element={<Reports />} />
+          <Route path="/reports/leaves" element={<Reports />} />
+          <Route path="/reports/payroll" element={<Reports />} />
+          <Route path="/reports/attrition" element={<Reports />} />
 
-        <Route path="/procurement/suppliers" element={<SupplierManagement />} />
-        <Route
-          path="/procurement/material-requests"
-          element={<MaterialRequests />}
-        />
-        <Route path="/procurement/rfq" element={<RFQCanvassing />} />
-        <Route
-          path="/procurement/purchase-orders"
-          element={<PurchaseOrders />}
-        />
-        <Route
-          path="/procurement/receiving-reports"
-          element={<ReceivingReports />}
-        />
-        <Route path="/inventory/items" element={<ItemMasterlist />} />
-        <Route path="/inventory/stock-levels" element={<StockLevels />} />
-        <Route path="/inventory/movements" element={<StockMovements />} />
-        <Route path="/inventory/warehouses" element={<WarehouseMapping />} />
-        <Route path="/inventory/reports" element={<InventoryReports />} />
-        <Route path="/logistics/deliveries" element={<DeliveryTracking />} />
-        <Route path="/logistics/vehicles" element={<VehicleManagement />} />
-        <Route path="/logistics/reports" element={<LogisticsReports />} />
-        <Route path="/sales/clients" element={<ClientManagement />} />
-        <Route path="/sales/orders" element={<SalesOrders />} />
-        <Route path="/sales/reports" element={<SalesReports />} />
-        <Route path="/projects" element={<ProjectList />} />
-        <Route path="/projects/timesheets" element={<ProjectTimesheets />} />
-        <Route path="/projects/budget" element={<ProjectBudget />} />
-        <Route path="/projects/reports" element={<ProjectReports />} />
-        <Route
-          path="/accounting/chart-of-accounts"
-          element={<ChartOfAccounts />}
-        />
-        <Route
-          path="/accounting/journal-entries"
-          element={<JournalEntries />}
-        />
-        <Route
-          path="/accounting/financial-statements"
-          element={<FinancialStatements />}
-        />
-        <Route
-          path="/accounting/accounts-payable"
-          element={<AccountsPayable />}
-        />
+          <Route path="/procurement/suppliers" element={<SupplierManagement />} />
+          <Route
+            path="/procurement/material-requests"
+            element={<MaterialRequests />}
+          />
+          <Route path="/procurement/rfq" element={<RFQCanvassing />} />
+          <Route
+            path="/procurement/purchase-orders"
+            element={<PurchaseOrders />}
+          />
+          <Route
+            path="/procurement/receiving-reports"
+            element={<ReceivingReports />}
+          />
+          <Route path="/inventory/items" element={<ItemMasterlist />} />
+          <Route path="/inventory/stock-levels" element={<StockLevels />} />
+          <Route path="/inventory/movements" element={<StockMovements />} />
+          <Route path="/inventory/warehouses" element={<WarehouseMapping />} />
+          <Route path="/inventory/reports" element={<InventoryReports />} />
+          <Route path="/logistics/deliveries" element={<DeliveryTracking />} />
+          <Route path="/logistics/vehicles" element={<VehicleManagement />} />
+          <Route path="/logistics/reports" element={<LogisticsReports />} />
+          <Route path="/sales/clients" element={<ClientManagement />} />
+          <Route path="/sales/orders" element={<SalesOrders />} />
+          <Route path="/sales/reports" element={<SalesReports />} />
+          <Route path="/projects" element={<ProjectList />} />
+          <Route path="/projects/timesheets" element={<ProjectTimesheets />} />
+          <Route path="/projects/budget" element={<ProjectBudget />} />
+          <Route path="/projects/reports" element={<ProjectReports />} />
+          <Route
+            path="/accounting/chart-of-accounts"
+            element={<ChartOfAccounts />}
+          />
+          <Route
+            path="/accounting/journal-entries"
+            element={<JournalEntries />}
+          />
+          <Route
+            path="/accounting/financial-statements"
+            element={<FinancialStatements />}
+          />
+          <Route
+            path="/accounting/accounts-payable"
+            element={<AccountsPayable />}
+          />
 
-        <Route path="*" element={<PageNotFound />} />
+          <Route path="*" element={<PageNotFound />} />
+        </Route>
       </Route>
     </Routes>
   );

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
+import { hasPageAccess } from "@/lib/pageAccess";
 import {
   Users,
   Clock,
@@ -12,6 +14,10 @@ import {
 import { Link } from "react-router-dom";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
+  const pageAccess = user?.page_access || [];
+
   const [stats, setStats] = useState({
     employees: 0,
     leaves: 0,
@@ -206,17 +212,19 @@ export default function Dashboard() {
           },
           {
             label: "View Reports",
-            link: "/reports?tab=headcount", // Fixed routing link
+            link: "/reports?tab=headcount",
           },
-        ].map((q) => (
-          <Link
-            key={q.label}
-            to={q.link}
-            className="border border-[#2E6F40]/20 bg-[#2E6F40]/5 text-[#2E6F40] rounded-xl p-4 text-sm font-semibold text-center hover:bg-[#2E6F40]/10 transition-colors"
-          >
-            {q.label}
-          </Link>
-        ))}
+        ]
+          .filter((q) => isSuperAdmin || hasPageAccess(pageAccess, q.link))
+          .map((q) => (
+            <Link
+              key={q.label}
+              to={q.link}
+              className="border border-[#2E6F40]/20 bg-[#2E6F40]/5 text-[#2E6F40] rounded-xl p-4 text-sm font-semibold text-center hover:bg-[#2E6F40]/10 transition-colors"
+            >
+              {q.label}
+            </Link>
+          ))}
       </div>
     </div>
   );

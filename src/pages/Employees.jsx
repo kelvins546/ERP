@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
+import { useAuth } from "@/lib/AuthContext";
+import { hasPageAccess } from "@/lib/pageAccess";
 import {
   Plus,
   Search,
@@ -42,6 +44,10 @@ const POSITION_LINK_TABLE_CANDIDATES = [
 ];
 
 export default function Employees() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
+  const pageAccess = user?.page_access || [];
+
   const [employees, setEmployees] = useState([]);
   const [departmentsById, setDepartmentsById] = useState({});
   const [projectSitesById, setProjectSitesById] = useState({});
@@ -292,15 +298,17 @@ export default function Employees() {
             {employees.length} total employees
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditEmployee(null);
-            setShowModal(true);
-          }}
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" /> Add Employee
-        </Button>
+        {(isSuperAdmin || hasPageAccess(pageAccess, "/employees")) && (
+          <Button
+            onClick={() => {
+              setEditEmployee(null);
+              setShowModal(true);
+            }}
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" /> Add Employee
+          </Button>
+        )}
       </div>
 
       {/* Filters */}

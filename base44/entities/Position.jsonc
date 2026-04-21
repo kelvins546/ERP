@@ -25,6 +25,14 @@
     "department_name": {
       "type": "string",
       "title": "Department"
+    },
+    "page_access": {
+      "type": "array",
+      "title": "Page Access",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of page paths this position has access to"
     }
   },
   "required": [

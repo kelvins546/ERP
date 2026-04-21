@@ -365,6 +365,19 @@ export default function EmployeeAssignmentModal({ employee, action, onClose, onS
           employeeUpdatePayload.project_site_name = primary ? primary.name : null;
         }
 
+        // Add multi-position support: Save all selected positions to position_ids and position_names arrays
+        if (action === "position") {
+          const positionIdProbe = await supabase.from("employees").select("position_ids").limit(1);
+          const positionNameProbe = await supabase.from("employees").select("position_names").limit(1);
+          
+          if (!positionIdProbe.error) {
+            employeeUpdatePayload.position_ids = normalizedIds.length > 0 ? normalizedIds : [];
+          }
+          if (!positionNameProbe.error) {
+            employeeUpdatePayload.position_names = selectedItems.length > 0 ? selectedItems.map(item => item.title) : [];
+          }
+        }
+
         if (Object.keys(employeeUpdatePayload).length > 0) {
           const { error: employeeUpdateError } = await supabase
             .from("employees")
@@ -391,22 +404,30 @@ export default function EmployeeAssignmentModal({ employee, action, onClose, onS
           supabase.from("employees").select("department_name").limit(1),
           supabase.from("employees").select("position_id").limit(1),
           supabase.from("employees").select("position_name").limit(1),
+          supabase.from("employees").select("position_ids").limit(1),
+          supabase.from("employees").select("position_names").limit(1),
         ]);
 
         if (!probes[0].error) payload.department_id = null;
         if (!probes[1].error) payload.department_name = null;
         if (!probes[2].error) payload.position_id = null;
         if (!probes[3].error) payload.position_name = null;
+        if (!probes[4].error) payload.position_ids = [];
+        if (!probes[5].error) payload.position_names = [];
       }
 
       if (action === "department") {
         const probes = await Promise.all([
           supabase.from("employees").select("position_id").limit(1),
           supabase.from("employees").select("position_name").limit(1),
+          supabase.from("employees").select("position_ids").limit(1),
+          supabase.from("employees").select("position_names").limit(1),
         ]);
 
         if (!probes[0].error) payload.position_id = null;
         if (!probes[1].error) payload.position_name = null;
+        if (!probes[2].error) payload.position_ids = [];
+        if (!probes[3].error) payload.position_names = [];
       }
 
       if (action === "projectSite" || action === "department") {

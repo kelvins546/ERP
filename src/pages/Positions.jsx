@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/api/base44Client";
-import { Plus, Edit, Trash2, X } from "lucide-react";
+import { Plus, Edit, Trash2, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ALL_PAGES, getPagesBySection } from "@/lib/pageAccess";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,6 +87,7 @@ function PosModal({
     base_salary_max: "",
     department_id: "",
     department_name: "",
+    page_access: [],
     ...pos,
   });
   const [errors, setErrors] = useState({});
@@ -94,6 +96,8 @@ function PosModal({
   const [saving, setSaving] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({});
+  const [searchQuery, setSearchQuery] = useState("");
   const [cleanForm, setCleanForm] = useState({
     title: "",
     salary_grade: "",
@@ -101,6 +105,7 @@ function PosModal({
     base_salary_max: "",
     department_id: "",
     department_name: "",
+    page_access: [],
     ...pos,
   });
 
@@ -151,6 +156,71 @@ function PosModal({
 
   const showError = (key) => (touched[key] || submitted) && errors[key];
 
+  const togglePageAccess = (path) => {
+    setForm((prev) => {
+      const currentAccess = Array.isArray(prev.page_access) ? prev.page_access : [];
+      const nextAccess = currentAccess.includes(path)
+        ? currentAccess.filter((p) => p !== path)
+        : [...currentAccess, path];
+      return { ...prev, page_access: nextAccess };
+    });
+  };
+
+  const toggleSelectAllPages = () => {
+    setForm((prev) => {
+      const allPaths = ALL_PAGES.map((p) => p.path);
+      const currentAccess = Array.isArray(prev.page_access) ? prev.page_access : [];
+      
+      // If all pages are selected, deselect all; otherwise select all
+      const allSelected = allPaths.every((path) => currentAccess.includes(path));
+      const nextAccess = allSelected ? [] : allPaths;
+      
+      return { ...prev, page_access: nextAccess };
+    });
+  };
+
+  const toggleSelectSectionPages = (section) => {
+    setForm((prev) => {
+      const sectionPages = ALL_PAGES.filter((p) => p.section === section).map(
+        (p) => p.path
+      );
+      const currentAccess = Array.isArray(prev.page_access) ? prev.page_access : [];
+      
+      // Check if all pages in this section are selected
+      const allSectionSelected = sectionPages.every((path) =>
+        currentAccess.includes(path)
+      );
+      
+      // If all are selected, deselect; otherwise select all in section
+      const nextAccess = allSectionSelected
+        ? currentAccess.filter((p) => !sectionPages.includes(p))
+        : [...new Set([...currentAccess, ...sectionPages])];
+      
+      return { ...prev, page_access: nextAccess };
+    });
+  };
+
+  const getFilteredPages = () => {
+    const pages = getPagesBySection();
+    if (!searchQuery.trim()) return pages;
+
+    const query = searchQuery.toLowerCase();
+    const filtered = {};
+
+    Object.entries(pages).forEach(([section, pageList]) => {
+      const filteredPages = pageList.filter(
+        (p) =>
+          p.label.toLowerCase().includes(query) ||
+          p.path.toLowerCase().includes(query)
+      );
+      if (filteredPages.length > 0) {
+        filtered[section] = filteredPages;
+      }
+    });
+
+    return filtered;
+  };
+
   const hasUnsavedChanges = () => {
     return JSON.stringify(form) !== JSON.stringify(cleanForm);
   };
@@ -171,6 +241,7 @@ function PosModal({
       base_salary_max: "",
       department_id: "",
       department_name: "",
+      page_access: [],
       ...pos,
     };
 
@@ -180,11 +251,17 @@ function PosModal({
         nextForm.salary_grade;
     }
 
+    // Ensure page_access is always an array
+    if (!Array.isArray(nextForm.page_access)) {
+      nextForm.page_access = [];
+    }
+
     setForm(nextForm);
     setCleanForm(nextForm);
     setErrors({});
     setTouched({});
     setSubmitted(false);
+    setExpandedSections({});
   }, [pos]);
 
   const requestSaveConfirmation = () => {
@@ -209,6 +286,9 @@ function PosModal({
         base_salary_max: form.base_salary_max
           ? Number(form.base_salary_max)
           : null,
+        page_access: Array.isArray(form.page_access) && form.page_access.length > 0 
+          ? form.page_access 
+          : [],
       };
 
       if (departmentLinkMode === "id") {
@@ -259,8 +339,8 @@ function PosModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between p-5 border-b">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b shrink-0">
           <h2 className="text-lg font-semibold">
             {pos ? "Edit Position" : "Add Position"}
           </h2>
@@ -269,7 +349,8 @@ function PosModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-3">
+        <div className="overflow-y-auto flex-1">
+          <div className="p-5 space-y-3">
           {errors.form && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
               {errors.form}
@@ -370,9 +451,131 @@ function PosModal({
               Automatically computed from minimum and maximum salary.
             </p>
           </div>
+
+          <div className="border-t pt-3 mt-3">
+            <label className="text-xs font-medium text-slate-600 block mb-2">
+              Page Access (for RBA)
+            </label>
+            <p className="text-[11px] text-slate-500 mb-3">
+              Select which pages this position can access:
+            </p>
+
+            {/* Search Bar */}
+            <div className="mb-3">
+              <Input
+                placeholder="Search pages..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+
+            {/* Select All / Deselect All Button */}
+            <div className="mb-3 flex gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAllPages}
+                className="flex-1 text-xs px-2 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded transition-colors font-medium"
+              >
+                {form.page_access?.length === ALL_PAGES.length
+                  ? "Deselect All"
+                  : "Select All"}
+              </button>
+            </div>
+
+            {/* Pages List with Section Toggles */}
+            <div className="space-y-2 max-h-64 overflow-y-auto border border-slate-200 rounded-lg p-2">
+              {Object.entries(getFilteredPages()).length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-4">
+                  No pages found matching "{searchQuery}"
+                </p>
+              ) : (
+                Object.entries(getFilteredPages()).map(([section, pages]) => {
+                  const sectionPages = ALL_PAGES.filter(
+                    (p) => p.section === section
+                  ).map((p) => p.path);
+                  const sectionSelected = sectionPages.every((path) =>
+                    form.page_access?.includes(path)
+                  );
+
+                  return (
+                    <div key={section}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedSections((prev) => ({
+                            ...prev,
+                            [section]: !prev[section],
+                          }))
+                        }
+                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                      >
+                        <ChevronDown
+                          className={`w-3 h-3 transition-transform ${
+                            expandedSections[section] ? "rotate-0" : "-rotate-90"
+                          }`}
+                        />
+                        <span className="flex-1 text-left">{section}</span>
+                        <span className="text-[10px] text-slate-500">
+                          {pages.filter((p) =>
+                            form.page_access?.includes(p.path)
+                          ).length}/{pages.length}
+                        </span>
+                      </button>
+
+                      {expandedSections[section] && (
+                        <div className="ml-4 mt-1 space-y-1 border-l-2 border-slate-200 pl-2">
+                          {/* Section Select All Button */}
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectSectionPages(section)}
+                            className="text-[11px] px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded transition-colors font-medium w-full text-center"
+                          >
+                            {sectionSelected
+                              ? "Deselect Section"
+                              : "Select Section"}
+                          </button>
+
+                          {/* Individual Pages */}
+                          <div className="space-y-1.5 mt-1.5">
+                            {pages.map((page) => (
+                              <label
+                                key={page.path}
+                                className="flex items-center gap-2 cursor-pointer text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    Array.isArray(form.page_access) &&
+                                    form.page_access.includes(page.path)
+                                  }
+                                  onChange={() => togglePageAccess(page.path)}
+                                  className="w-3 h-3 rounded border-slate-300 text-blue-600"
+                                />
+                                <span className="text-slate-700">
+                                  {page.label}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {form.page_access?.length === 0 && (
+              <p className="text-[11px] text-amber-600 mt-2">
+                ⚠️ No pages selected. This position will have no page access.
+              </p>
+            )}
+          </div>
+        </div>
         </div>
 
-        <div className="flex justify-end gap-3 p-5 border-t">
+        <div className="flex justify-end gap-3 p-5 border-t shrink-0">
           <Button variant="outline" onClick={handleCloseClick}>
             Cancel
           </Button>

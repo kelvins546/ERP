@@ -39,6 +39,9 @@ export const AuthProvider = ({ children }) => {
       project_site_id: employeeRow?.project_site_id || null,
       project_site_name: employeeRow?.project_site_name || null,
       employee_status: employeeRow?.status || null,
+      position_id: employeeRow?.position_id || null,
+      position_title: employeeRow?.position_title || null,
+      page_access: employeeRow?.page_access || [],
     };
   };
 
@@ -47,7 +50,7 @@ export const AuthProvider = ({ children }) => {
 
     const withActive = await supabase
       .from("employees")
-      .select("id, first_name, last_name, email, status, project_site_id, is_account_active")
+      .select("id, first_name, last_name, email, status, project_site_id, is_account_active, position_id, position_ids")
       .eq("auth_id", authUserId)
       .maybeSingle();
 
@@ -64,7 +67,7 @@ export const AuthProvider = ({ children }) => {
 
       const withoutActive = await supabase
         .from("employees")
-        .select("id, first_name, last_name, email, status, project_site_id")
+        .select("id, first_name, last_name, email, status, project_site_id, position_id, position_ids")
         .eq("auth_id", authUserId)
         .maybeSingle();
 
@@ -89,9 +92,46 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
+    // Fetch and combine page access from all positions (multi-role support)
+    let combinedPageAccess = [];
+    let positionTitle = null;
+
+    // Get position IDs to fetch
+    const positionIdsToFetch = Array.isArray(employeeRow.position_ids)
+      ? employeeRow.position_ids.filter(Boolean)
+      : [];
+
+    // Add primary position if not in multi-role array
+    if (employeeRow.position_id && !positionIdsToFetch.includes(employeeRow.position_id)) {
+      positionIdsToFetch.push(employeeRow.position_id);
+    }
+
+    if (positionIdsToFetch.length > 0) {
+      const { data: posRows, error: posError } = await supabase
+        .from("positions")
+        .select("id, title, page_access")
+        .in("id", positionIdsToFetch);
+
+      if (!posError && posRows && posRows.length > 0) {
+        // Use the first position's title for display
+        positionTitle = posRows[0].title;
+
+        // Combine page access from all positions (union)
+        const accessSet = new Set();
+        posRows.forEach((pos) => {
+          if (Array.isArray(pos.page_access)) {
+            pos.page_access.forEach((page) => accessSet.add(page));
+          }
+        });
+        combinedPageAccess = Array.from(accessSet);
+      }
+    }
+
     return {
       ...employeeRow,
       project_site_name: projectSiteName,
+      position_title: positionTitle,
+      page_access: combinedPageAccess,
     };
   };
 
@@ -173,6 +213,9 @@ export const AuthProvider = ({ children }) => {
         role: "super admin",
         project_site_id: projectSite.id,
         project_site_name: projectSite.name,
+        position_id: null,
+        position_title: "Superadmin",
+        page_access: [], // Empty means full access for superadmin
       };
 
       setUser(authUser);

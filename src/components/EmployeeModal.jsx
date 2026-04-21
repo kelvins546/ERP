@@ -392,12 +392,54 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
         payload.project_site_name = normalize(form.project_site_name);
 
       if (employee?.id) {
+        // On edit: also save multi-position arrays if available
+        const positionIdProbe = await supabase.from("employees").select("position_ids").limit(1);
+        const positionNameProbe = await supabase.from("employees").select("position_names").limit(1);
+        
+        if (!positionIdProbe.error) {
+          payload.position_ids = selectedPositionIds.length > 0 ? selectedPositionIds : [];
+        }
+        if (!positionNameProbe.error) {
+          payload.position_names = selectedPositionLabels.length > 0 ? selectedPositionLabels : [];
+        }
+
         const { error } = await supabase
           .from("employees")
           .update(payload)
           .eq("id", employee.id);
         if (error) throw error;
+
+        // Also update link table if in multi-position mode
+        if (multiPositionMode && positionLinkTable) {
+          const { error: deleteError } = await supabase
+            .from(positionLinkTable)
+            .delete()
+            .eq("employee_id", employee.id);
+          if (deleteError) throw deleteError;
+
+          if (selectedPositionIds.length > 0) {
+            const rows = selectedPositionIds.map((positionId) => ({
+              employee_id: employee.id,
+              position_id: positionId,
+            }));
+            const { error: insertError } = await supabase
+              .from(positionLinkTable)
+              .insert(rows);
+            if (insertError) throw insertError;
+          }
+        }
       } else {
+        // For new employees: also include multi-position arrays
+        const positionIdProbe = await supabase.from("employees").select("position_ids").limit(1);
+        const positionNameProbe = await supabase.from("employees").select("position_names").limit(1);
+        
+        if (!positionIdProbe.error && selectedPositionIds.length > 0) {
+          payload.position_ids = selectedPositionIds;
+        }
+        if (!positionNameProbe.error && selectedPositionLabels.length > 0) {
+          payload.position_names = selectedPositionLabels;
+        }
+
         const { data: insertedEmployee, error } = await supabase
           .from("employees")
           .insert([payload])

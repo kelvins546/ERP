@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { hasPageAccess } from "@/lib/pageAccess";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -180,12 +181,21 @@ const navItems = [
   -------------------------------- */
 ];
 
-function NavItem({ item, collapsed }) {
+function NavItem({ item, collapsed, userRole, pageAccess }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const Icon = item.icon;
 
+  // Check if user is superadmin (has full access)
+  const isSuperAdmin = userRole === "super admin";
+
+  // For single-level items (no children)
   if (!item.children) {
+    // Check if user has access to this page
+    if (!isSuperAdmin && !hasPageAccess(pageAccess, item.path)) {
+      return null; // Don't render if no access
+    }
+
     const active = location.pathname === item.path;
     return (
       <Link
@@ -203,7 +213,17 @@ function NavItem({ item, collapsed }) {
     );
   }
 
-  const isActive = item.children.some((c) => location.pathname === c.path);
+  // Filter children based on access
+  const accessibleChildren = item.children.filter((child) => {
+    return isSuperAdmin || hasPageAccess(pageAccess, child.path);
+  });
+
+  // Don't render the section if no children are accessible
+  if (accessibleChildren.length === 0) {
+    return null;
+  }
+
+  const isActive = accessibleChildren.some((c) => location.pathname === c.path);
 
   return (
     <div>
@@ -230,7 +250,7 @@ function NavItem({ item, collapsed }) {
       </button>
       {open && !collapsed && (
         <div className="ml-8 mt-1 space-y-1">
-          {item.children.map((child) => {
+          {accessibleChildren.map((child) => {
             const active = location.pathname === child.path;
             return (
               <Link
@@ -331,7 +351,13 @@ export default function HRISLayout() {
 
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {navItems.map((item) => (
-            <NavItem key={item.label} item={item} collapsed={collapsed} />
+            <NavItem 
+              key={item.label} 
+              item={item} 
+              collapsed={collapsed}
+              userRole={user?.role}
+              pageAccess={user?.page_access}
+            />
           ))}
         </nav>
 

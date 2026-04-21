@@ -36,11 +36,27 @@
     },
     "position_id": {
       "type": "string",
-      "title": "Position ID"
+      "title": "Position ID (Primary)"
     },
     "position_name": {
       "type": "string",
-      "title": "Position"
+      "title": "Position (Primary)"
+    },
+    "position_ids": {
+      "type": "array",
+      "title": "Position IDs (Multi-Role)",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of position IDs for multi-role support"
+    },
+    "position_names": {
+      "type": "array",
+      "title": "Positions (Multi-Role)",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of position names for multi-role support"
     },
     "manager_id": {
       "type": "string",

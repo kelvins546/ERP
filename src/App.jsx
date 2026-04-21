@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
 import Departments from "./pages/Departments";
 import Positions from "./pages/Positions";
+import ProjectSites from "./pages/ProjectSites";
 import Announcements from "./pages/Announcements";
 import Tasks from "./pages/Tasks";
 import Documents from "./pages/Documents";
@@ -106,6 +107,7 @@ const AppContent = () => {
         <Route path="/employees" element={<Employees />} />
         <Route path="/departments" element={<Departments />} />
         <Route path="/positions" element={<Positions />} />
+        <Route path="/project-sites" element={<ProjectSites />} />
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/documents" element={<Documents />} />

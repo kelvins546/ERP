@@ -1,8 +1,28 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/api/base44Client";
-import { Plus, Edit, Trash2, X } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Edit, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
@@ -27,8 +48,20 @@ const priorityColors = {
   high: "bg-red-100 text-red-700 border-red-200",
 };
 
+const TASK_STATUS_OPTIONS = ["pending", "in_progress", "completed", "cancelled"];
+const TASK_PRIORITY_OPTIONS = ["low", "medium", "high"];
+
+const formatOptionLabel = (value) =>
+  value
+    ? value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+    : "All";
+
+const formatEmployeeName = (employee) =>
+  `${employee?.first_name || ""} ${employee?.last_name || ""}`.trim();
+
 // --- THE MODAL (CREATE & UPDATE) ---
 function TaskModal({ task, onClose, onSaved }) {
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -83,6 +116,9 @@ function TaskModal({ task, onClose, onSaved }) {
   };
 
   const showError = (key) => (touched[key] || submitted) && errors[key];
+  const selectedEmployee = employees.find(
+    (employee) => String(employee.id) === String(form.employee_id),
+  );
 
   const hasUnsavedChanges = () => {
     return JSON.stringify(form) !== JSON.stringify(cleanForm);
@@ -118,6 +154,7 @@ function TaskModal({ task, onClose, onSaved }) {
     setErrors({});
     setTouched({});
     setSubmitted(false);
+    setAssigneeOpen(false);
   }, [task]);
 
   useEffect(() => {
@@ -209,18 +246,72 @@ function TaskModal({ task, onClose, onSaved }) {
             <label className="text-xs font-medium text-slate-600">
               Assigned To
             </label>
-            <select
-              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              value={form.employee_id || ""}
-              onChange={(e) => set("employee_id", e.target.value)}
-            >
-              <option value="">Unassigned</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.first_name} {emp.last_name}
-                </option>
-              ))}
-            </select>
+            <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  role="combobox"
+                  aria-expanded={assigneeOpen}
+                  className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                >
+                  <span className="truncate">
+                    {selectedEmployee
+                      ? formatEmployeeName(selectedEmployee)
+                      : "Unassigned"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-slate-400" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search employee..." />
+                  <CommandList>
+                    <CommandEmpty>No employee found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="Unassigned"
+                        onSelect={() => {
+                          set("employee_id", "");
+                          setAssigneeOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            !form.employee_id ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                        Unassigned
+                      </CommandItem>
+                      {employees.map((employee) => {
+                        const employeeName = formatEmployeeName(employee);
+                        const isSelected =
+                          String(employee.id) === String(form.employee_id);
+
+                        return (
+                          <CommandItem
+                            key={employee.id}
+                            value={`${employeeName} ${employee.id}`}
+                            onSelect={() => {
+                              set("employee_id", String(employee.id));
+                              setAssigneeOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                isSelected ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                            {employeeName}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600">
@@ -238,35 +329,41 @@ function TaskModal({ task, onClose, onSaved }) {
               <label className="text-xs font-medium text-slate-600">
                 Status
               </label>
-              <select
-                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              <Select
                 value={form.status}
-                onChange={(e) => set("status", e.target.value)}
+                onValueChange={(value) => set("status", value)}
               >
-                {["pending", "in_progress", "completed", "cancelled"].map(
-                  (s) => (
-                    <option key={s} value={s}>
-                      {s.replace("_", " ")}
-                    </option>
-                  )
-                )}
-              </select>
+                <SelectTrigger className="mt-1 w-full bg-white border-slate-200 text-sm">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_STATUS_OPTIONS.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {formatOptionLabel(status)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600">
                 Priority
               </label>
-              <select
-                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              <Select
                 value={form.priority}
-                onChange={(e) => set("priority", e.target.value)}
+                onValueChange={(value) => set("priority", value)}
               >
-                {["low", "medium", "high"].map((p) => (
-                  <option key={p} value={p}>
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 w-full bg-white border-slate-200 text-sm">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_PRIORITY_OPTIONS.map((priority) => (
+                    <SelectItem key={priority} value={priority}>
+                      {formatOptionLabel(priority)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div>
@@ -437,19 +534,23 @@ export default function Tasks() {
         </Button>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {["", "pending", "in_progress", "completed", "cancelled"].map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${statusFilter === s ? "bg-blue-600 text-white shadow-sm" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-          >
-            {s
-              ? s.replace("_", " ").charAt(0).toUpperCase() +
-                s.slice(1).replace("_", " ")
-              : "All"}
-          </button>
-        ))}
+      <div className="max-w-xs">
+        <label className="mb-1 block text-xs font-medium text-slate-600">
+          Filter by Status
+        </label>
+        <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
+          <SelectTrigger className="w-full bg-white border-slate-200 text-sm">
+            <SelectValue placeholder="All" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            {TASK_STATUS_OPTIONS.map((status) => (
+              <SelectItem key={status} value={status}>
+                {formatOptionLabel(status)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (

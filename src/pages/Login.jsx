@@ -62,7 +62,7 @@ export default function Login() {
   const authStateMessage = useMemo(() => {
     if (!authError?.type) return "";
     if (authError.type === "account_deactivated") {
-      return "Your account is deactivated. Please contact HR admin.";
+      return "Your account is terminated. Please contact HR admin.";
     }
     if (authError.type === "user_not_registered") {
       return "No employee record is linked to this account.";

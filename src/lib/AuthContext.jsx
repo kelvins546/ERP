@@ -6,6 +6,25 @@ const AUTH_STORAGE_KEY = "erp_local_auth_session";
 const SUPERADMIN_EMAIL = "arksuperadmin@gmail.com";
 const SUPERADMIN_PASSWORD = "123456";
 
+const mapSupabaseAuthError = (authError) => {
+  const message = String(authError?.message || "");
+  const lowered = message.toLowerCase();
+
+  if (lowered.includes("email not confirmed")) {
+    return "Your email is not confirmed yet. Check your inbox or use the activation link again.";
+  }
+
+  if (lowered.includes("invalid login credentials")) {
+    return "Invalid email or password.";
+  }
+
+  if (lowered.includes("too many requests")) {
+    return "Too many login attempts. Please wait and try again.";
+  }
+
+  return message || "Failed to log in.";
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -195,7 +214,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async ({ email, password, projectSite }) => {
     const normalizedEmail = (email || "").trim().toLowerCase();
-    const normalizedPassword = (password || "").trim();
+    const normalizedPassword = String(password ?? "");
 
     if (!projectSite?.id) {
       return { success: false, message: "Please select a project site." };
@@ -234,7 +253,7 @@ export const AuthProvider = ({ children }) => {
       if (authError) {
         return {
           success: false,
-          message: "Invalid email or password.",
+          message: mapSupabaseAuthError(authError),
         };
       }
 

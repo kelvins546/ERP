@@ -1,38 +1,196 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { MapPin, Fingerprint, Wifi, WifiOff, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  createGeofenceInOutWatcher,
+  createLocalStorageStore,
+} from "../lib/geofenceTimeIn";
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function localDayKey(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function resolveGeofenceTarget() {
+  const envLat = Number(import.meta.env.VITE_GEOFENCE_LAT);
+  const envLon = Number(import.meta.env.VITE_GEOFENCE_LON);
+  if (Number.isFinite(envLat) && Number.isFinite(envLon)) {
+    return { lat: envLat, lon: envLon, source: "env" };
+  }
+  return null;
+}
 
 export default function MobileTimeIn() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(null);
   const [geoStatus, setGeoStatus] = useState("idle");
   const [coords, setCoords] = useState(null);
+  const [distanceMeters, setDistanceMeters] = useState(null);
+  const [accuracyMeters, setAccuracyMeters] = useState(null);
+  const [withinGeofence, setWithinGeofence] = useState(null);
   const [offlineQueue, setOfflineQueue] = useState([]);
+  const watcherRef = useRef(null);
 
-  const getLocation = () => new Promise((res, rej) => {
-    setGeoStatus("loading");
-    navigator.geolocation.getCurrentPosition(p => { setCoords({ lat: p.coords.latitude, lon: p.coords.longitude }); setGeoStatus("ok"); res(p.coords); }, () => { setGeoStatus("error"); rej(); });
-  });
+  const geofenceTarget = useMemo(() => resolveGeofenceTarget(), []);
 
-  const logTime = async (type) => {
+  const getLocation = () =>
+    new Promise((res, rej) => {
+      setGeoStatus("loading");
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          setCoords({ lat: p.coords.latitude, lon: p.coords.longitude });
+          setGeoStatus("ok");
+          res(p.coords);
+        },
+        () => {
+          setGeoStatus("error");
+          rej();
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      );
+    });
+
+  const logTime = async (type, options = {}) => {
     setLoading(true);
     try {
-      let lat = null, lon = null;
-      try { const c = await getLocation(); lat = c.latitude; lon = c.longitude; } catch {}
       const now = new Date();
-      const record = { employee_id: "current", type, device_timestamp: now.toISOString(), calculated_server_time: now.toISOString(), latitude: lat, longitude: lon, is_within_geofence: !!lat, biometric_verified: false, is_offline_sync: false };
+      const deviceTimestamp = options.timestampISO || now.toISOString();
+
+      let lat = null;
+      let lon = null;
+
+      if (options.coords?.lat != null && options.coords?.lon != null) {
+        lat = options.coords.lat;
+        lon = options.coords.lon;
+        setCoords({ lat, lon });
+        setGeoStatus("ok");
+      } else {
+        try {
+          const c = await getLocation();
+          lat = c.latitude;
+          lon = c.longitude;
+        } catch {}
+      }
+
+      const record = {
+        employee_id: "current",
+        type,
+        device_timestamp: deviceTimestamp,
+        calculated_server_time: now.toISOString(),
+        latitude: lat,
+        longitude: lon,
+        is_within_geofence: options.isWithinGeofence === true,
+        biometric_verified: false,
+        is_offline_sync: false,
+      };
       if (navigator.onLine) {
         await base44.entities.AttendanceLog.create(record);
-        setStatus({ type, time: now.toLocaleTimeString(), synced: true });
+        setStatus({ type, time: new Date(deviceTimestamp).toLocaleTimeString(), synced: true });
+
+        // Mark same-day triggers for the geofence watcher logic.
+        const dayKey = localDayKey(new Date(deviceTimestamp));
+        if (type === "TIME_IN") {
+          window?.localStorage?.setItem(
+            "attendance_auto_timein:last_timein_day",
+            dayKey,
+          );
+        }
+        if (type === "TIME_OUT") {
+          window?.localStorage?.setItem(
+            "attendance_auto_timein:last_timeout_day",
+            dayKey,
+          );
+        }
       } else {
         const queue = [...offlineQueue, record];
         setOfflineQueue(queue);
         localStorage.setItem("offline_timein_queue", JSON.stringify(queue));
-        setStatus({ type, time: now.toLocaleTimeString(), synced: false });
+        setStatus({ type, time: new Date(deviceTimestamp).toLocaleTimeString(), synced: false });
+
+        // Same-day flag also applies offline to keep behavior consistent.
+        const dayKey = localDayKey(new Date(deviceTimestamp));
+        if (type === "TIME_IN") {
+          window?.localStorage?.setItem(
+            "attendance_auto_timein:last_timein_day",
+            dayKey,
+          );
+        }
+        if (type === "TIME_OUT") {
+          window?.localStorage?.setItem(
+            "attendance_auto_timein:last_timeout_day",
+            dayKey,
+          );
+        }
       }
     } finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    if (!geofenceTarget) return;
+
+    const threshold = Number(import.meta.env.VITE_GEOFENCE_RADIUS_METERS ?? 50);
+    const thresholdMeters = Number.isFinite(threshold) && threshold > 0 ? threshold : 50;
+
+    const watcher = createGeofenceInOutWatcher({
+      target: { lat: geofenceTarget.lat, lon: geofenceTarget.lon },
+      thresholdMeters,
+      maxAccuracyMeters: 50,
+      store: createLocalStorageStore("attendance_auto_timein"),
+      requireTimeInBeforeTimeOut: true,
+      onUpdate: (u) => {
+        if (u?.reason === "geolocation_error") {
+          setGeoStatus("error");
+          return;
+        }
+        if (u?.reason === "low_accuracy") {
+          setGeoStatus("loading");
+          setAccuracyMeters(u?.accuracyMeters ?? null);
+          return;
+        }
+        if (u?.coords) {
+          setCoords(u.coords);
+          setGeoStatus("ok");
+        }
+        if (typeof u?.distanceMeters === "number") {
+          setDistanceMeters(u.distanceMeters);
+          setWithinGeofence(u.withinThreshold);
+        }
+        if (typeof u?.accuracyMeters === "number") {
+          setAccuracyMeters(u.accuracyMeters);
+        }
+      },
+      onTimeIn: async (payload) => {
+        await logTime("TIME_IN", {
+          coords: payload.coords,
+          timestampISO: payload.triggeredAt,
+          isWithinGeofence: true,
+          isAuto: true,
+        });
+      },
+      onTimeOut: async (payload) => {
+        await logTime("TIME_OUT", {
+          coords: payload.coords,
+          timestampISO: payload.triggeredAt,
+          isWithinGeofence: false,
+          isAuto: true,
+        });
+      },
+    });
+
+    watcherRef.current = watcher;
+    try {
+      watcher.start();
+    } catch {
+      setGeoStatus("error");
+    }
+    return () => watcher.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geofenceTarget?.lat, geofenceTarget?.lon]);
 
   const syncOffline = async () => {
     setLoading(true);
@@ -64,6 +222,14 @@ export default function MobileTimeIn() {
             {navigator.onLine ? "Online" : "Offline"}
           </div>
         </div>
+
+        {geofenceTarget && geoStatus === "ok" && typeof distanceMeters === "number" && (
+          <div className="text-xs text-slate-600 px-2">
+            Distance from set location: {Math.round(distanceMeters)}m · Radius {Math.round(thresholdMeters)}m
+            {typeof accuracyMeters === "number" ? ` · Accuracy ±${Math.round(accuracyMeters)}m` : ""}
+            {withinGeofence === true ? " · Inside" : withinGeofence === false ? " · Outside" : ""}
+          </div>
+        )}
 
         {status && (
           <div className={`rounded-xl p-4 text-center ${status.synced?"bg-green-50 border border-green-200":"bg-yellow-50 border border-yellow-200"}`}>

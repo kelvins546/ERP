@@ -40,16 +40,63 @@ export default function MobileTimeIn() {
 
   const getLocation = () =>
     new Promise((res, rej) => {
+      if (!navigator.geolocation) {
+        setGeoStatus("error");
+        rej(new Error("Geolocation not supported"));
+        return;
+      }
+
       setGeoStatus("loading");
-      navigator.geolocation.getCurrentPosition(
-        (p) => {
-          setCoords({ lat: p.coords.latitude, lon: p.coords.longitude });
+
+      let watchId = null;
+      let timeoutId = null;
+      let best = null;
+
+      const finish = (coords, error) => {
+        if (watchId != null) navigator.geolocation.clearWatch(watchId);
+        if (timeoutId != null) window.clearTimeout(timeoutId);
+        watchId = null;
+        timeoutId = null;
+
+        if (coords) {
+          setCoords({ lat: coords.latitude, lon: coords.longitude });
           setGeoStatus("ok");
-          res(p.coords);
-        },
-        () => {
+          res(coords);
+        } else {
           setGeoStatus("error");
-          rej();
+          rej(error || new Error("Unable to fetch location"));
+        }
+      };
+
+      timeoutId = window.setTimeout(() => {
+        if (best) finish(best);
+        else finish(null, new Error("Location timeout"));
+      }, 15000);
+
+      watchId = navigator.geolocation.watchPosition(
+        (p) => {
+          const coords = p?.coords;
+          const accuracy = coords?.accuracy;
+          if (!coords || typeof coords.latitude !== "number" || typeof coords.longitude !== "number") {
+            return;
+          }
+
+          if (!best) {
+            best = coords;
+          } else {
+            const bestAcc = typeof best.accuracy === "number" ? best.accuracy : Number.POSITIVE_INFINITY;
+            const candAcc = typeof accuracy === "number" ? accuracy : Number.POSITIVE_INFINITY;
+            if (candAcc < bestAcc) best = coords;
+          }
+
+          // Resolve early on a good fix.
+          if (typeof accuracy === "number" && accuracy <= 30) {
+            finish(coords);
+          }
+        },
+        (err) => {
+          if (best) finish(best);
+          else finish(null, err);
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
       );

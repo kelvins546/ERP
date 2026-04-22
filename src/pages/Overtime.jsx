@@ -3,6 +3,7 @@ import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
 import { Plus, X, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/AuthContext";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
@@ -24,7 +25,7 @@ const makeEmployeeKey = (employee) => employee?.id || employee?.employee_id || "
 const getTodayYMD = () => new Date().toISOString().split("T")[0];
 
 // --- THE MODAL (CREATE & UPDATE) ---
-function OTModal({ ot, employees, onClose, onSaved }) {
+function OTModal({ ot, employees, onClose, onSaved, canCreate }) {
   const employeeOptions = employees || [];
   const [form, setForm] = useState({
     employee_id: "",
@@ -48,6 +49,11 @@ function OTModal({ ot, employees, onClose, onSaved }) {
   );
 
   const save = async () => {
+    if (!ot?.id && !canCreate) {
+      alert("Super admin can only review/respond to overtime requests.");
+      return;
+    }
+
     const effectiveDate = form.ot_date || form.date || "";
     if (effectiveDate < getTodayYMD()) {
       alert("Past dates are not allowed. Please select today or a future date.");
@@ -200,6 +206,9 @@ function OTModal({ ot, employees, onClose, onSaved }) {
 
 // --- THE MAIN PAGE (READ & QUICK UPDATE) ---
 export default function Overtime() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
+
   const [items, setItems] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -291,15 +300,17 @@ export default function Overtime() {
             Submit and review overtime applications.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditItem(null);
-            setShowModal(true);
-          }}
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" /> New OT Request
-        </Button>
+        {!isSuperAdmin && (
+          <Button
+            onClick={() => {
+              setEditItem(null);
+              setShowModal(true);
+            }}
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" /> New OT Request
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -436,6 +447,7 @@ export default function Overtime() {
             setShowModal(false);
             load();
           }}
+          canCreate={!isSuperAdmin}
         />
       )}
     </div>

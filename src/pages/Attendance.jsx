@@ -41,11 +41,67 @@ function getCurrentCoords() {
       reject(new Error("Geolocation not supported"));
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
+
+    let watchId = null;
+    let timeoutId = null;
+    let best = null;
+
+    const finish = (result, error) => {
+      if (watchId != null) navigator.geolocation.clearWatch(watchId);
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      watchId = null;
+      timeoutId = null;
+      if (result) resolve(result);
+      else reject(error || new Error("Unable to fetch location"));
+    };
+
+    const isFiniteNumber = (n) => typeof n === "number" && Number.isFinite(n);
+
+    const handlePos = (p) => {
+      const lat = p?.coords?.latitude;
+      const lon = p?.coords?.longitude;
+      const accuracyMeters = p?.coords?.accuracy;
+      if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) return;
+
+      const candidate = {
+        lat,
+        lon,
+        accuracyMeters: isFiniteNumber(accuracyMeters) ? accuracyMeters : null,
+      };
+
+      if (!best) {
+        best = candidate;
+      } else {
+        const bestAcc = best.accuracyMeters ?? Number.POSITIVE_INFINITY;
+        const candAcc = candidate.accuracyMeters ?? Number.POSITIVE_INFINITY;
+        if (candAcc < bestAcc) best = candidate;
+      }
+
+      // Resolve early if we have a good GPS fix.
+      if (candidate.accuracyMeters != null && candidate.accuracyMeters <= 30) {
+        finish(candidate);
+      }
+    };
+
+    const handleErr = (err) => {
+      // If we already captured at least one point, prefer returning it.
+      if (best) {
+        finish(best);
+        return;
+      }
+      finish(null, err);
+    };
+
+    timeoutId = window.setTimeout(() => {
+      if (best) finish(best);
+      else finish(null, new Error("Location timeout"));
+    }, 15000);
+
+    watchId = navigator.geolocation.watchPosition(handlePos, handleErr, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000,
+    });
   });
 }
 
@@ -61,6 +117,7 @@ function LogModal({ onClose, onSaved }) {
   });
   const [geofence, setGeofence] = useState(() => getGeofenceConfig());
   const [coords, setCoords] = useState(null);
+  const [accuracyMeters, setAccuracyMeters] = useState(null);
   const [geoStatus, setGeoStatus] = useState("idle");
   const [withinGeofence, setWithinGeofence] = useState(null);
   const [distanceMeters, setDistanceMeters] = useState(null);
@@ -77,11 +134,13 @@ function LogModal({ onClose, onSaved }) {
     setGeoStatus("loading");
     setWithinGeofence(null);
     setDistanceMeters(null);
+    setAccuracyMeters(null);
     try {
       const gf = getGeofenceConfig();
       setGeofence(gf);
       const c = await getCurrentCoords();
-      setCoords(c);
+      setCoords({ lat: c.lat, lon: c.lon });
+      setAccuracyMeters(typeof c.accuracyMeters === "number" ? c.accuracyMeters : null);
       setGeoStatus("ok");
       if (!gf) {
         setWithinGeofence(null);
@@ -91,12 +150,18 @@ function LogModal({ onClose, onSaved }) {
           { lat: c.lat, lon: c.lon },
         );
         setDistanceMeters(distance);
-        setWithinGeofence(distance <= gf.radiusMeters);
+
+        // Account for GPS uncertainty to reduce false "outside" readings.
+        // If the accuracy circle overlaps the geofence, treat it as within.
+        const acc = typeof c.accuracyMeters === "number" ? c.accuracyMeters : 0;
+        const effectiveDistance = Math.max(0, distance - acc);
+        setWithinGeofence(effectiveDistance <= gf.radiusMeters);
       }
     } catch (e) {
       setGeoStatus("error");
       setCoords(null);
       setDistanceMeters(null);
+      setAccuracyMeters(null);
       setWithinGeofence(false);
     }
   };
@@ -306,6 +371,12 @@ function LogModal({ onClose, onSaved }) {
                       <span className="text-slate-500">
                         {" "}
                         · Distance {Math.round(distanceMeters)}m
+                      </span>
+                    ) : null}
+                    {typeof accuracyMeters === "number" ? (
+                      <span className="text-slate-500">
+                        {" "}
+                        · Accuracy ±{Math.round(accuracyMeters)}m
                       </span>
                     ) : null}
                     {coords ? (

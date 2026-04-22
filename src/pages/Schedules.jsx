@@ -1,8 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/api/base44Client";
-import { Edit2, Plus, Trash2, X } from "lucide-react";
+import { Edit2, Megaphone, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useNavigate } from "react-router-dom";
 
 const days = [
   "Monday",
@@ -90,6 +98,241 @@ const normalizeScheduleForm = (schedule) => ({
   expected_time_out: normalizeTimeValue(schedule?.expected_time_out, defaultSchedule.expected_time_out),
   required_hours: normalizeTimeValue(schedule?.required_hours, defaultSchedule.required_hours),
 });
+
+const ANNOUNCEMENT_TYPES = ["informationals", "urgents", "criticals"];
+
+function toDateInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function getDefaultCloseDate(daysAhead = 7) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysAhead);
+  return toDateInputValue(date);
+}
+
+function buildScheduleAnnouncementContent(schedule) {
+  if (!schedule) return "";
+
+  const expectedIn = schedule.expected_time_in
+    ? normalizeTimeValue(schedule.expected_time_in, defaultSchedule.expected_time_in)
+    : defaultSchedule.expected_time_in;
+  const expectedOut = schedule.expected_time_out
+    ? normalizeTimeValue(schedule.expected_time_out, defaultSchedule.expected_time_out)
+    : defaultSchedule.expected_time_out;
+  const requiredHours = schedule.required_hours
+    ? normalizeTimeValue(schedule.required_hours, defaultSchedule.required_hours)
+    : defaultSchedule.required_hours;
+
+  const workDays = Array.isArray(schedule.work_days)
+    ? schedule.work_days
+    : [];
+
+  return [
+    `Schedule: ${schedule.name || "—"}`,
+    `Description: ${schedule.description || "—"}`,
+    `Start Time: ${expectedIn.slice(0, 5)}`,
+    `End Time: ${expectedOut.slice(0, 5)}`,
+    `Total Hours: ${formatHours(calculateTotalHours(expectedIn, expectedOut))}`,
+    `Required Hours: ${requiredHours.slice(0, 5)}`,
+    `Grace Period: ${Number(schedule.grace_period_mins ?? defaultSchedule.grace_period_mins)} mins`,
+    `Working Days: ${workDays.length ? workDays.join(", ") : "—"}`,
+  ].join("\n");
+}
+
+function ScheduleAnnouncementModal({ schedule, onClose, onSaved }) {
+  const navigate = useNavigate();
+
+  const initialForm = useMemo(() => {
+    const scheduleName = schedule?.name || "Schedule";
+    const scheduleEnd = normalizeTimeValue(
+      schedule?.expected_time_out,
+      defaultSchedule.expected_time_out,
+    ).slice(0, 5);
+
+    return {
+      title: `Schedule Update: ${scheduleName}`,
+      content: buildScheduleAnnouncementContent(schedule),
+      type: "informationals",
+      close_date: getDefaultCloseDate(7),
+      close_time: scheduleEnd || "17:00",
+      is_pinned: false,
+    };
+  }, [schedule]);
+
+  const [form, setForm] = useState(initialForm);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    setForm(initialForm);
+    setErrors({});
+  }, [initialForm]);
+
+  const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const validate = () => {
+    const nextErrors = {};
+    if (!form.title?.trim()) nextErrors.title = "Title is required.";
+    if (!form.content?.trim()) nextErrors.content = "Content is required.";
+    if (!form.type) nextErrors.type = "Type is required.";
+    if (!form.close_date) nextErrors.close_date = "Close date is required.";
+    if (!form.close_time) nextErrors.close_time = "Close time is required.";
+    setErrors(nextErrors);
+    return nextErrors;
+  };
+
+  const post = async () => {
+    const formErrors = validate();
+    if (Object.keys(formErrors).length > 0) return;
+
+    setSaving(true);
+    try {
+      const payload = {
+        title: form.title.trim(),
+        content: form.content.trim(),
+        type: form.type,
+        close_date: form.close_date,
+        close_time: form.close_time,
+        is_pinned: Boolean(form.is_pinned),
+      };
+
+      const { error } = await supabase.from("announcements").insert([payload]);
+      if (error) throw error;
+
+      onSaved?.();
+      navigate("/announcements");
+    } catch (error) {
+      console.error("Error posting announcement:", error.message);
+      setErrors({ form: error.message || "Failed to post announcement." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
+          <div>
+            <h2 className="text-lg font-semibold">Announce Schedule</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Posts an announcement using this schedule’s details.
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {errors.form && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {errors.form}
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium text-slate-600">Title *</label>
+            <Input
+              className={`mt-1 ${errors.title ? "border-red-500" : ""}`}
+              value={form.title}
+              onChange={(event) => set("title", event.target.value)}
+              placeholder="Announcement title"
+            />
+            {errors.title && (
+              <p className="mt-1 text-xs text-red-600">{errors.title}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600">Type *</label>
+            <Select value={form.type} onValueChange={(value) => set("type", value)}>
+              <SelectTrigger className={`mt-1 ${errors.type ? "border-red-500" : ""}`}>
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {ANNOUNCEMENT_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.type && (
+              <p className="mt-1 text-xs text-red-600">{errors.type}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600">Close Date *</label>
+              <Input
+                type="date"
+                className={`mt-1 ${errors.close_date ? "border-red-500" : ""}`}
+                value={form.close_date}
+                onChange={(event) => set("close_date", event.target.value)}
+              />
+              {errors.close_date && (
+                <p className="mt-1 text-xs text-red-600">{errors.close_date}</p>
+              )}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600">Close Time *</label>
+              <Input
+                type="time"
+                className={`mt-1 ${errors.close_time ? "border-red-500" : ""}`}
+                value={form.close_time}
+                onChange={(event) => set("close_time", event.target.value)}
+              />
+              {errors.close_time && (
+                <p className="mt-1 text-xs text-red-600">{errors.close_time}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600">Content *</label>
+            <textarea
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
+                errors.content ? "border-red-500" : "border-slate-200"
+              }`}
+              rows={8}
+              value={form.content}
+              onChange={(event) => set("content", event.target.value)}
+              placeholder="Announcement message"
+            />
+            {errors.content && (
+              <p className="mt-1 text-xs text-red-600">{errors.content}</p>
+            )}
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={Boolean(form.is_pinned)}
+              onChange={(event) => set("is_pinned", event.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm text-slate-600">Pin this announcement</span>
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-3 p-5 border-t">
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={post} disabled={saving}>
+            {saving ? "Posting..." : "Post to Announcements"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ScheduleModal({ schedule, onClose, onSaved }) {
   const [form, setForm] = useState(normalizeScheduleForm(schedule));
@@ -286,6 +529,8 @@ export default function Schedules() {
   const [search, setSearch] = useState("");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editSchedule, setEditSchedule] = useState(null);
+  const [showAnnounceModal, setShowAnnounceModal] = useState(false);
+  const [announceSchedule, setAnnounceSchedule] = useState(null);
 
   const load = async () => {
     try {
@@ -442,6 +687,18 @@ export default function Schedules() {
                             <button
                               type="button"
                               onClick={() => {
+                                setAnnounceSchedule(schedule);
+                                setShowAnnounceModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                              title="Announce this schedule"
+                            >
+                              <Megaphone className="w-3.5 h-3.5" />
+                              Announce
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
                                 setEditSchedule(schedule);
                                 setShowScheduleModal(true);
                               }}
@@ -477,6 +734,20 @@ export default function Schedules() {
           onSaved={() => {
             setShowScheduleModal(false);
             load();
+          }}
+        />
+      )}
+
+      {showAnnounceModal && (
+        <ScheduleAnnouncementModal
+          schedule={announceSchedule}
+          onClose={() => {
+            setShowAnnounceModal(false);
+            setAnnounceSchedule(null);
+          }}
+          onSaved={() => {
+            setShowAnnounceModal(false);
+            setAnnounceSchedule(null);
           }}
         />
       )}

@@ -187,7 +187,7 @@ function NavItem({ item, collapsed, userRole, pageAccess }) {
   const Icon = item.icon;
 
   // Check if user is superadmin (has full access)
-  const isSuperAdmin = userRole === "super admin";
+  const isSuperAdmin = userRole === "superadmin";
 
   // For single-level items (no children)
   if (!item.children) {

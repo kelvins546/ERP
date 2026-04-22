@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
 import { useAuth } from "@/lib/AuthContext";
-import { hasPageAccess } from "@/lib/pageAccess";
+import { canAccessPage } from "@/lib/pageAccess";
 import {
   Plus,
   Search,
@@ -298,7 +298,7 @@ export default function Employees() {
             {employees.length} total employees
           </p>
         </div>
-        {(isSuperAdmin || hasPageAccess(pageAccess, "/employees")) && (
+        {canAccessPage(isSuperAdmin, pageAccess, "/employees") && (
           <Button
             onClick={() => {
               setEditEmployee(null);

@@ -210,7 +210,7 @@ export const AuthProvider = ({ children }) => {
         email: SUPERADMIN_EMAIL,
         first_name: "Ark",
         last_name: "Superadmin",
-        role: "super admin",
+        role: "superadmin",
         project_site_id: projectSite.id,
         project_site_name: projectSite.name,
         position_id: null,

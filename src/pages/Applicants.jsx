@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import emailjs from "@emailjs/browser";
 
 // These statuses MUST match the 'applicant_status' ENUM in your SQL database
 const stages = ["applied", "interviewing", "offered", "rejected", "hired"];
@@ -559,6 +560,9 @@ export default function Applicants() {
   const [editApplicant, setEditApplicant] = useState(null);
   const [viewApplicant, setViewApplicant] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [interviewDate, setInterviewDate] = useState("");
+  const [interviewTime, setInterviewTime] = useState("");
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   const load = async () => {
     try {
@@ -733,7 +737,7 @@ export default function Applicants() {
                               }
                               className="px-2 py-1.5 text-[10px] xl:text-xs font-bold text-[#2E6F40] bg-[#2E6F40]/10 hover:bg-[#2E6F40]/20 border border-[#2E6F40]/20 rounded-lg transition-colors"
                             >
-                              Accept
+                              Invite to Interview
                             </button>
                           </>
                         ) : (
@@ -806,7 +810,7 @@ export default function Applicants() {
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">
               {confirmAction.type === "accept"
-                ? "Accept Applicant?"
+                ? "Invite to Interview?"
                 : "Decline Applicant?"}
             </h3>
             <p className="text-sm text-slate-500 mb-8 leading-relaxed">
@@ -817,37 +821,110 @@ export default function Applicants() {
               </strong>
               ?
               {confirmAction.type === "accept"
-                ? " They will be moved to the Interviewing stage."
+                ? " They will be moved to the Interviewing stage and sent an email invite."
                 : " They will be moved to the Rejected stage."}
             </p>
+
+            {confirmAction.type === "accept" && (
+              <div className="mb-8 text-left space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">
+                    Interview Date *
+                  </label>
+                  <Input
+                    type="date"
+                    value={interviewDate}
+                    onChange={(e) => setInterviewDate(e.target.value)}
+                    className="focus-visible:ring-[#2E6F40]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">
+                    Interview Time *
+                  </label>
+                  <Input
+                    type="time"
+                    value={interviewTime}
+                    onChange={(e) => setInterviewTime(e.target.value)}
+                    className="focus-visible:ring-[#2E6F40]"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 justify-center">
               <Button
                 variant="outline"
                 className="rounded-xl px-6"
-                onClick={() => setConfirmAction(null)}
+                onClick={() => {
+                  setConfirmAction(null);
+                  setInterviewDate("");
+                  setInterviewTime("");
+                }}
+                disabled={sendingInvite}
               >
                 Cancel
               </Button>
               <Button
-                className={`rounded-xl px-6 ${confirmAction.type === "accept" ? "bg-[#2E6F40] hover:bg-[#235330] text-white shadow-md" : "bg-red-600 hover:bg-red-700 text-white shadow-md"}`}
+                disabled={sendingInvite}
+                className={`rounded-xl px-6 transition-all ${confirmAction.type === "accept" ? "bg-[#2E6F40] hover:bg-[#235330] text-white shadow-md" : "bg-red-600 hover:bg-red-700 text-white shadow-md"}`}
                 onClick={async () => {
                   const status =
                     confirmAction.type === "accept"
                       ? "interviewing"
                       : "rejected";
                   try {
+                    if (confirmAction.type === "accept") {
+                      if (!interviewDate || !interviewTime) {
+                        alert("Please select both an interview date and time.");
+                        return;
+                      }
+                      if (!confirmAction.applicant.email) {
+                        alert("This applicant does not have an email address.");
+                        return;
+                      }
+                      
+                      setSendingInvite(true);
+                      
+                      const templateParams = {
+                        applicant_name: `${confirmAction.applicant.first_name} ${confirmAction.applicant.last_name}`,
+                        applicant_email: confirmAction.applicant.email,
+                        to_email: confirmAction.applicant.email,
+                        interview_date: interviewDate,
+                        interview_time: interviewTime,
+                      };
+
+                      await emailjs.send(
+                        import.meta.env.VITE_EMAILJS_SERVICE_ID_NEW || "service_6gfuxme",
+                        import.meta.env.VITE_EMAILJS_TEMPLATE_ID_NEW || "template_fwm5tau",
+                        templateParams,
+                        import.meta.env.VITE_EMAILJS_PUBLIC_KEY_NEW || "fAh7fSwX2e7yd9FNx"
+                      );
+                      
+                      alert("Success! Interview invitation sent.");
+                    }
+
                     await supabase
                       .from("applicants")
                       .update({ status })
                       .eq("id", confirmAction.applicant.id);
+
                     load();
                     setConfirmAction(null);
+                    setInterviewDate("");
+                    setInterviewTime("");
                   } catch (e) {
-                    alert("Failed to update status. Check your ENUMs!");
+                    console.error("Error processing applicant:", e);
+                    alert("Failed to process request: " + (e.message || e.text || "Unknown error"));
+                  } finally {
+                    setSendingInvite(false);
                   }
                 }}
               >
-                Confirm {confirmAction.type === "accept" ? "Accept" : "Decline"}
+                {sendingInvite 
+                  ? "Sending..." 
+                  : `Confirm ${confirmAction.type === "accept" ? "Invite" : "Decline"}`
+                }
               </Button>
             </div>
           </div>

@@ -1,8 +1,19 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/api/base44Client";
-import { Plus, X, Calendar, User, Briefcase } from "lucide-react";
+import { Plus, X, Calendar, User, Briefcase, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusColors = {
   scheduled: "bg-blue-100 text-blue-700 border-blue-200",
@@ -251,6 +262,8 @@ export default function Interviews() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editInterview, setEditInterview] = useState(null);
+  const [actionModal, setActionModal] = useState(null);
+  const navigate = useNavigate();
 
   const load = async () => {
     try {
@@ -401,6 +414,25 @@ export default function Interviews() {
                       "{i.remarks}"
                     </p>
                   )}
+
+                  {!(i.status === "passed" || i.status === "failed") && (
+                    <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
+                      <Button
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); setActionModal({ type: "pass", interview: i }); }}
+                        className="flex-1 font-bold text-[#2E6F40] bg-[#2E6F40]/10 hover:bg-[#2E6F40]/20 border-transparent shadow-none"
+                      >
+                        Pass
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); setActionModal({ type: "reject", interview: i }); }}
+                        className="flex-1 font-bold text-red-600 bg-red-50 hover:bg-red-100 border-transparent shadow-none"
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -419,6 +451,50 @@ export default function Interviews() {
             load();
           }}
         />
+      )}
+
+      {actionModal && (
+        <AlertDialog open={!!actionModal} onOpenChange={(open) => { if (!open) setActionModal(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {actionModal.type === "pass" ? "Pass Interview?" : "Reject Applicant?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to {actionModal.type} <strong className="text-slate-800">{actionModal.interview.applicants?.first_name} {actionModal.interview.applicants?.last_name}</strong>?
+                {actionModal.type === "pass" ? " They will be moved to the Job Offers stage." : " They will be moved to the Rejected stage."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={actionModal.processing}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={actionModal.processing}
+                className={actionModal.type === "pass" ? "bg-[#2E6F40] hover:bg-[#235330] text-white" : "bg-red-600 hover:bg-red-700 text-white"}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  setActionModal(prev => ({...prev, processing: true}));
+                  try {
+                    if (actionModal.type === "pass") {
+                      await supabase.from("interviews").update({ status: "passed" }).eq("id", actionModal.interview.id);
+                      await supabase.from("applicants").update({ status: "offered" }).eq("id", actionModal.interview.applicant_id);
+                      navigate("/job-offers");
+                    } else {
+                      await supabase.from("interviews").update({ status: "failed" }).eq("id", actionModal.interview.id);
+                      await supabase.from("applicants").update({ status: "rejected" }).eq("id", actionModal.interview.applicant_id);
+                      navigate("/applicants");
+                    }
+                  } catch (error) {
+                    console.error(error);
+                    alert("Action failed: " + error.message);
+                    setActionModal(prev => ({...prev, processing: false}));
+                  }
+                }}
+              >
+                {actionModal.processing ? "Processing..." : `Confirm ${actionModal.type === "pass" ? "Pass" : "Reject"}`}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

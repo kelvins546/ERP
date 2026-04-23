@@ -3,7 +3,6 @@ import { supabase } from "@/api/base44Client";
 import {
   Plus,
   X,
-  ChevronRight,
   Mail,
   Phone,
   CheckCircle,
@@ -11,7 +10,6 @@ import {
   User,
   Eye,
   Edit,
-  ChevronLeft,
   FileText,
   ExternalLink,
 } from "lucide-react";
@@ -562,20 +560,30 @@ export default function Applicants() {
   const [confirmAction, setConfirmAction] = useState(null);
   const [interviewDate, setInterviewDate] = useState("");
   const [interviewTime, setInterviewTime] = useState("");
+  const [interviewerId, setInterviewerId] = useState("");
+  const [interviewFormat, setInterviewFormat] = useState("video");
+  const [interviewRemarks, setInterviewRemarks] = useState("");
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [employees, setEmployees] = useState([]);
 
   const load = async () => {
     try {
       setLoading(true);
-      // Supabase Read - Ordered by newest first
-      const { data, error } = await supabase
-        .from("applicants")
-        .select("*, job_postings(*)")
-        .order("created_at", { ascending: false })
-        .limit(200);
+      const [appsRes, empsRes] = await Promise.all([
+        supabase
+          .from("applicants")
+          .select("*, job_postings(*)")
+          .order("created_at", { ascending: false })
+          .limit(200),
+        supabase
+          .from("employees")
+          .select("id, first_name, last_name")
+          .eq("status", "regular"),
+      ]);
 
-      if (error) throw error;
-      setApplicants(data || []);
+      if (appsRes.error) throw appsRes.error;
+      setApplicants(appsRes.data || []);
+      if (!empsRes.error) setEmployees(empsRes.data || []);
     } catch (error) {
       console.error("Failed to load applicants:", error.message);
     } finally {
@@ -588,28 +596,6 @@ export default function Applicants() {
   }, []);
 
   const byStage = (stage) => applicants.filter((a) => a.status === stage);
-
-  const moveStage = async (applicant, direction) => {
-    const idx = stages.indexOf(applicant.status);
-    const next = stages[idx + direction];
-    if (!next) return;
-
-    try {
-      // Supabase Update Status
-      const { error } = await supabase
-        .from("applicants")
-        .update({ status: next })
-        .eq("id", applicant.id);
-
-      if (error) throw error;
-      load(); // Refresh board
-    } catch (error) {
-      console.error("Failed to move applicant:", error.message);
-      alert(
-        "Failed to update status. Make sure your database ENUMs are updated.",
-      );
-    }
-  };
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -741,26 +727,14 @@ export default function Applicants() {
                             </button>
                           </>
                         ) : (
-                          <>
-                            {stages.indexOf(a.status) > 0 && (
-                              <button
-                                onClick={() => moveStage(a, -1)}
-                                className="p-1 xl:p-1.5 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-200 border border-slate-100 rounded-lg transition-colors"
-                                title="Move Stage Back"
-                              >
-                                <ChevronLeft className="w-3 h-3 xl:w-4 xl:h-4" />
-                              </button>
-                            )}
-                            {stages.indexOf(a.status) < stages.length - 1 && (
-                              <button
-                                onClick={() => moveStage(a, 1)}
-                                className="p-1 xl:p-1.5 text-[#2E6F40]/70 hover:text-[#2E6F40] bg-[#2E6F40]/10 hover:bg-[#2E6F40]/20 border border-[#2E6F40]/20 rounded-lg transition-colors"
-                                title="Move Stage Forward"
-                              >
-                                <ChevronRight className="w-3 h-3 xl:w-4 xl:h-4" />
-                              </button>
-                            )}
-                          </>
+                          (a.status === "interviewing" || a.status === "offered") ? (
+                            <button
+                              onClick={() => setConfirmAction({ type: "decline", applicant: a })}
+                              className="px-2 py-1.5 text-[10px] xl:text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg transition-colors ml-auto"
+                            >
+                              Reject
+                            </button>
+                          ) : null
                         )}
                       </div>
                     </div>
@@ -826,27 +800,72 @@ export default function Applicants() {
             </p>
 
             {confirmAction.type === "accept" && (
-              <div className="mb-8 text-left space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="mb-8 text-left space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100 max-h-64 overflow-y-auto">
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">
-                    Interview Date *
+                    Interviewer (Employee)
                   </label>
-                  <Input
-                    type="date"
-                    value={interviewDate}
-                    onChange={(e) => setInterviewDate(e.target.value)}
-                    className="focus-visible:ring-[#2E6F40]"
-                  />
+                  <select
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white"
+                    value={interviewerId}
+                    onChange={(e) => setInterviewerId(e.target.value)}
+                  >
+                    <option value="">Unassigned / TBD</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.first_name} {emp.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">
+                      Interview Date *
+                    </label>
+                    <Input
+                      type="date"
+                      value={interviewDate}
+                      onChange={(e) => setInterviewDate(e.target.value)}
+                      className="focus-visible:ring-[#2E6F40]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">
+                      Interview Time *
+                    </label>
+                    <Input
+                      type="time"
+                      value={interviewTime}
+                      onChange={(e) => setInterviewTime(e.target.value)}
+                      className="focus-visible:ring-[#2E6F40]"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">
-                    Interview Time *
+                    Format
                   </label>
-                  <Input
-                    type="time"
-                    value={interviewTime}
-                    onChange={(e) => setInterviewTime(e.target.value)}
-                    className="focus-visible:ring-[#2E6F40]"
+                  <select
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white"
+                    value={interviewFormat}
+                    onChange={(e) => setInterviewFormat(e.target.value)}
+                  >
+                    <option value="in_person">In Person</option>
+                    <option value="video">Video Call</option>
+                    <option value="phone">Phone</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">
+                    Remarks / Notes
+                  </label>
+                  <textarea
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all"
+                    rows={2}
+                    value={interviewRemarks}
+                    onChange={(e) => setInterviewRemarks(e.target.value)}
+                    placeholder="e.g. Bring portfolio..."
                   />
                 </div>
               </div>
@@ -860,6 +879,9 @@ export default function Applicants() {
                   setConfirmAction(null);
                   setInterviewDate("");
                   setInterviewTime("");
+                  setInterviewerId("");
+                  setInterviewFormat("video");
+                  setInterviewRemarks("");
                 }}
                 disabled={sendingInvite}
               >
@@ -901,6 +923,20 @@ export default function Applicants() {
                         import.meta.env.VITE_EMAILJS_PUBLIC_KEY_NEW || "fAh7fSwX2e7yd9FNx"
                       );
                       
+                      const scheduledIso = new Date(
+                        `${interviewDate}T${interviewTime || "00:00"}:00`,
+                      ).toISOString();
+
+                      const { error: intError } = await supabase.from("interviews").insert([{
+                        applicant_id: confirmAction.applicant.id,
+                        interviewer_id: interviewerId || null,
+                        scheduled_time: scheduledIso,
+                        format: interviewFormat,
+                        remarks: interviewRemarks,
+                        status: "scheduled",
+                      }]);
+                      if (intError) throw intError;
+                      
                       alert("Success! Interview invitation sent.");
                     }
 
@@ -913,6 +949,9 @@ export default function Applicants() {
                     setConfirmAction(null);
                     setInterviewDate("");
                     setInterviewTime("");
+                    setInterviewerId("");
+                    setInterviewFormat("video");
+                    setInterviewRemarks("");
                   } catch (e) {
                     console.error("Error processing applicant:", e);
                     alert("Failed to process request: " + (e.message || e.text || "Unknown error"));

@@ -1,8 +1,19 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/api/base44Client";
-import { Plus, X, DollarSign, User, Briefcase, FileText } from "lucide-react";
+import { Plus, X, DollarSign, User, Briefcase, FileText, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusColors = {
   pending: "bg-amber-100 text-amber-700 border-amber-200",
@@ -222,6 +233,8 @@ export default function JobOffers() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editOffer, setEditOffer] = useState(null);
+  const [actionModal, setActionModal] = useState(null);
+  const navigate = useNavigate();
 
   const load = async () => {
     try {
@@ -362,6 +375,25 @@ export default function JobOffers() {
                       "{o.notes}"
                     </p>
                   )}
+
+                  {(!o.status || o.status === "pending") && (
+                    <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
+                      <Button
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); setActionModal({ type: "hire", offer: o }); }}
+                        className="flex-1 font-bold text-[#2E6F40] bg-[#2E6F40]/10 hover:bg-[#2E6F40]/20 border-transparent shadow-none"
+                      >
+                        Hire
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); setActionModal({ type: "reject", offer: o }); }}
+                        className="flex-1 font-bold text-red-600 bg-red-50 hover:bg-red-100 border-transparent shadow-none"
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -380,6 +412,51 @@ export default function JobOffers() {
           }}
         />
       )}
+
+      {actionModal && (
+        <AlertDialog open={!!actionModal} onOpenChange={(open) => { if (!open) setActionModal(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {actionModal.type === "hire" ? "Hire Applicant?" : "Reject Offer?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to {actionModal.type} <strong className="text-slate-800">{actionModal.offer.applicants?.first_name} {actionModal.offer.applicants?.last_name}</strong>?
+                {actionModal.type === "hire" ? " They will be moved to the Hired stage." : " They will be moved to the Rejected stage."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={actionModal.processing}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={actionModal.processing}
+                className={actionModal.type === "hire" ? "bg-[#2E6F40] hover:bg-[#235330] text-white" : "bg-red-600 hover:bg-red-700 text-white"}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  setActionModal(prev => ({...prev, processing: true}));
+                  try {
+                    if (actionModal.type === "hire") {
+                      await supabase.from("job_offers").update({ status: "accepted" }).eq("id", actionModal.offer.id);
+                      await supabase.from("applicants").update({ status: "hired" }).eq("id", actionModal.offer.applicant_id);
+                      navigate("/applicants");
+                    } else {
+                      await supabase.from("job_offers").update({ status: "declined" }).eq("id", actionModal.offer.id);
+                      await supabase.from("applicants").update({ status: "rejected" }).eq("id", actionModal.offer.applicant_id);
+                      navigate("/applicants");
+                    }
+                  } catch (error) {
+                    console.error(error);
+                    alert("Action failed: " + error.message);
+                    setActionModal(prev => ({...prev, processing: false}));
+                  }
+                }}
+              >
+                {actionModal.processing ? "Processing..." : `Confirm ${actionModal.type === "hire" ? "Hire" : "Reject"}`}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
     </div>
   );
 }

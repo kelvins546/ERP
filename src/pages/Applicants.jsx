@@ -687,18 +687,6 @@ export default function Applicants() {
                         <FileText className="w-3 h-3" />{" "}
                         <span className="hidden xl:inline">View CV</span>
                       </button>
-                      {a.status !== "applied" && (
-                        <button
-                          onClick={() => {
-                            setEditApplicant(a);
-                            setShowModal(true);
-                          }}
-                          className="text-[10px] xl:text-xs text-slate-600 hover:text-blue-600 font-semibold flex items-center gap-1 transition-colors bg-slate-50 hover:bg-blue-50 px-2 py-1.5 rounded-lg"
-                        >
-                          <Edit className="w-3 h-3" />{" "}
-                          <span className="hidden xl:inline">Edit</span>
-                        </button>
-                      )}
 
                       <div className="ml-auto flex gap-1">
                         {a.status === "applied" ? (
@@ -734,7 +722,33 @@ export default function Applicants() {
                             >
                               Reject
                             </button>
-                          ) : null
+                          ) : (
+                            a.status === "rejected" ? (
+                              <select
+                                className="px-2 py-1 text-[10px] xl:text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg transition-colors ml-auto outline-none cursor-pointer"
+                                onChange={async (e) => {
+                                  const newStatus = e.target.value;
+                                  if (newStatus) {
+                                    try {
+                                      await supabase
+                                        .from("applicants")
+                                        .update({ status: newStatus })
+                                        .eq("id", a.id);
+                                      load();
+                                    } catch (err) {
+                                      console.error("Failed to move applicant", err);
+                                      alert("Failed to move applicant.");
+                                    }
+                                  }
+                                }}
+                                value=""
+                              >
+                                <option value="" disabled>Move to...</option>
+                                <option value="interviewing">Interviewing</option>
+                                <option value="offered">Offered</option>
+                              </select>
+                            ) : null
+                          )
                         )}
                       </div>
                     </div>

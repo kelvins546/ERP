@@ -28,6 +28,7 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
     applicant_id: offer?.applicant_id || "",
     position_title: offer?.position_title || "",
     offered_salary: offer?.offered_salary || 0,
+    payment_type: offer?.applicants?.payment_type || "monthly",
     start_date: offer?.start_date || "",
     status: offer?.status || "pending",
     notes: offer?.notes || "",
@@ -49,6 +50,7 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
         selectedApplicant?.job_postings?.post_title ||
         selectedApplicant?.job_postings?.title ||
         prev.position_title,
+      payment_type: selectedApplicant?.payment_type || "monthly",
     }));
   };
 
@@ -74,6 +76,15 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
         const { error } = await supabase.from("job_offers").insert([payload]);
         if (error) throw error;
       }
+
+      if (form.applicant_id && form.payment_type) {
+        const { error: appError } = await supabase
+          .from("applicants")
+          .update({ payment_type: form.payment_type })
+          .eq("id", form.applicant_id);
+        if (appError) console.error("Failed to update applicant payment type:", appError);
+      }
+
       onSaved();
     } catch (error) {
       console.error("Error saving job offer:", error.message);
@@ -164,6 +175,25 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
             </div>
             <div>
               <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 block">
+                Payment Type
+              </label>
+              <select
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white"
+                value={form.payment_type}
+                onChange={(e) => set("payment_type", e.target.value)}
+              >
+                <option value="weekly">Weekly</option>
+                <option value="bi-weekly">Bi-weekly</option>
+                <option value="semi-monthly">Semi-monthly</option>
+                <option value="monthly">Monthly</option>
+                <option value="anually">Annually</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 block">
                 Target Start Date
               </label>
               <Input
@@ -173,23 +203,22 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
                 onChange={(e) => set("start_date", e.target.value)}
               />
             </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 block">
-              Offer Status
-            </label>
-            <select
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white"
-              value={form.status}
-              onChange={(e) => set("status", e.target.value)}
-            >
-              {["pending", "accepted", "declined", "withdrawn"].map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 block">
+                Offer Status
+              </label>
+              <select
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white"
+                value={form.status}
+                onChange={(e) => set("status", e.target.value)}
+              >
+                {["pending", "accepted", "declined", "withdrawn"].map((s) => (
+                  <option key={s} value={s}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -246,15 +275,16 @@ export default function JobOffers() {
         supabase
           .from("job_offers")
           .select(
-            "*, applicants(first_name, last_name, job_postings(title, post_title))",
+            "*, applicants!inner(first_name, last_name, payment_type, status, job_postings(title, post_title))",
           )
+          .eq("applicants.status", "offered")
           .order("created_at", { ascending: false })
           .limit(200),
 
         // 2. Fetch Applicants specifically in the 'offered' pipeline stage
         supabase
           .from("applicants")
-          .select("id, first_name, last_name, job_postings(title, post_title)")
+          .select("id, first_name, last_name, payment_type, job_postings(title, post_title)")
           .eq("status", "offered"),
       ]);
 

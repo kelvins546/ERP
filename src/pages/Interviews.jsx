@@ -78,6 +78,14 @@ function InterviewModal({
       } else {
         const { error } = await supabase.from("interviews").insert([payload]);
         if (error) throw error;
+        
+        if (form.applicant_id) {
+          const { error: appError } = await supabase
+            .from("applicants")
+            .update({ status: "interviewing" })
+            .eq("id", form.applicant_id);
+          if (appError) console.error("Failed to update applicant status:", appError);
+        }
       }
       onSaved();
     } catch (error) {
@@ -134,7 +142,7 @@ function InterviewModal({
               ))}
             </select>
             <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
-              Only applicants in the "Interviewing" stage appear here.
+              Only applicants in the "Applied" stage appear here.
             </p>
           </div>
 
@@ -277,18 +285,18 @@ export default function Interviews() {
           .select(
             `
             *,
-            applicants(first_name, last_name, job_postings(title, post_title)),
+            applicants(first_name, last_name, status, job_postings(title, post_title)),
             employees(first_name, last_name)
           `,
           )
           .order("scheduled_time", { ascending: true })
           .limit(200),
 
-        // 2. Fetch Applicants who are strictly in the 'interviewing' stage
+        // 2. Fetch Applicants who are strictly in the 'applied' stage
         supabase
           .from("applicants")
           .select("id, first_name, last_name, job_postings(title, post_title)")
-          .eq("status", "interviewing"),
+          .eq("status", "applied"),
 
         // 3. Fetch Employees to act as interviewers
         supabase
@@ -343,13 +351,13 @@ export default function Interviews() {
         </div>
       ) : (
         <div className="space-y-4">
-          {interviews.length === 0 ? (
+          {interviews.filter(i => i.applicants?.status === 'interviewing').length === 0 ? (
             <div className="text-center py-16 text-slate-400 font-medium bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">
               No interviews scheduled.
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {interviews.map((i) => (
+              {interviews.filter(i => i.applicants?.status === 'interviewing').map((i) => (
                 <div
                   key={i.id}
                   className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between gap-4 cursor-pointer hover:shadow-md hover:border-[#2E6F40]/30 transition-all"

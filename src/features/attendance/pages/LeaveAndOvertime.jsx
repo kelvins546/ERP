@@ -3,14 +3,24 @@ import { base44 } from "@/api/base44Client";
 import { Plus, X, Check, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/AuthContext";
 
 const statusColors = { pending:"bg-yellow-100 text-yellow-700", approved:"bg-green-100 text-green-700", rejected:"bg-red-100 text-red-700" };
 
-function LeaveModal({ item, onClose, onSaved }) {
+function LeaveModal({ item, onClose, onSaved, canCreate }) {
   const [form, setForm] = useState({ employee_name:"", leave_type:"vacation", start_date:"", end_date:"", total_days:1, reason:"", status:"pending", ...item });
   const [saving, setSaving] = useState(false);
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
-  const save = async () => { setSaving(true); if (item?.id) await base44.entities.LeaveRequest.update(item.id, form); else await base44.entities.LeaveRequest.create({...form, employee_id:"manual"}); onSaved(); };
+  const save = async () => {
+    if (!item?.id && !canCreate) {
+      alert("Super admin can only review/respond to leave requests.");
+      return;
+    }
+    setSaving(true);
+    if (item?.id) await base44.entities.LeaveRequest.update(item.id, form);
+    else await base44.entities.LeaveRequest.create({ ...form, employee_id:"manual" });
+    onSaved();
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -40,11 +50,20 @@ function LeaveModal({ item, onClose, onSaved }) {
   );
 }
 
-function OTModal({ item, onClose, onSaved }) {
+function OTModal({ item, onClose, onSaved, canCreate }) {
   const [form, setForm] = useState({ employee_name:"", date:"", requested_hours:1, reason:"", status:"pending", ...item });
   const [saving, setSaving] = useState(false);
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
-  const save = async () => { setSaving(true); if (item?.id) await base44.entities.OvertimeRequest.update(item.id, form); else await base44.entities.OvertimeRequest.create({...form, employee_id:"manual"}); onSaved(); };
+  const save = async () => {
+    if (!item?.id && !canCreate) {
+      alert("Super admin can only review/respond to overtime requests.");
+      return;
+    }
+    setSaving(true);
+    if (item?.id) await base44.entities.OvertimeRequest.update(item.id, form);
+    else await base44.entities.OvertimeRequest.create({ ...form, employee_id:"manual" });
+    onSaved();
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -67,6 +86,9 @@ function OTModal({ item, onClose, onSaved }) {
 }
 
 export default function LeaveAndOvertime() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
+
   const [tab, setTab] = useState("leave");
   const [leaves, setLeaves] = useState([]);
   const [ot, setOt] = useState([]);
@@ -90,7 +112,9 @@ export default function LeaveAndOvertime() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold text-slate-900">Leave & Overtime</h1><p className="text-sm text-slate-500 mt-1">Filing & Approval Workflows</p></div>
-        <Button onClick={() => { setEditItem(null); setModal(tab==="leave"?"leave":"ot"); }} className="gap-2"><Plus className="w-4 h-4"/> {tab==="leave"?"File Leave":"File OT"}</Button>
+        {!isSuperAdmin && (
+          <Button onClick={() => { setEditItem(null); setModal(tab==="leave"?"leave":"ot"); }} className="gap-2"><Plus className="w-4 h-4"/> {tab==="leave"?"File Leave":"File OT"}</Button>
+        )}
       </div>
       <div className="flex items-center justify-between">
         <div className="flex gap-2 border-b border-slate-200">
@@ -142,8 +166,8 @@ export default function LeaveAndOvertime() {
           )}
         </div>
       )}
-      {modal==="leave" && <LeaveModal item={editItem} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);load();}}/>}
-      {modal==="ot" && <OTModal item={editItem} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);load();}}/>}
+      {modal==="leave" && <LeaveModal item={editItem} canCreate={!isSuperAdmin} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);load();}}/>}
+      {modal==="ot" && <OTModal item={editItem} canCreate={!isSuperAdmin} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);load();}}/>}
     </div>
   );
 }

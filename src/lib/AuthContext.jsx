@@ -2,9 +2,105 @@ import React, { createContext, useState, useContext, useEffect } from "react";
 import { supabase } from "@/api/base44Client";
 
 const AuthContext = createContext(null);
-const AUTH_STORAGE_KEY = "erp_local_auth_session";
-const SUPERADMIN_EMAIL = "arksuperadmin@gmail.com";
-const SUPERADMIN_PASSWORD = "123456";
+
+const isSuperadminIdentity = (identity) => {
+  const role = String(
+    identity?.role ||
+      identity?.user_metadata?.role ||
+      identity?.app_metadata?.role ||
+      "",
+  ).toLowerCase();
+
+  return role === "superadmin";
+};
+
+const fetchSuperadminAccountProfile = async (sessionUser) => {
+  if (!sessionUser) return null;
+
+  const normalizedEmail = String(sessionUser.email || "").trim().toLowerCase();
+  const probes = [];
+
+  if (normalizedEmail) {
+    probes.push(
+      supabase
+        .from("chart_of_accounts")
+        .select("id, account_code, account_name")
+        .eq("account_type", "superadmin")
+        .ilike("account_code", normalizedEmail)
+        .maybeSingle(),
+    );
+  }
+
+  probes.push(
+    supabase
+      .from("chart_of_accounts")
+      .select("id, account_code, account_name")
+      .eq("account_type", "superadmin")
+      .eq("id", sessionUser.id)
+      .maybeSingle(),
+  );
+
+  for (const probePromise of probes) {
+    const probe = await probePromise;
+    if (!probe.error && probe.data) {
+      return probe.data;
+    }
+  }
+
+  return null;
+};
+
+const buildSuperadminAuthUser = (identity, projectSite = null, accountProfile = null) => {
+  const displayName = String(
+    accountProfile?.account_name ||
+      identity?.user_metadata?.name ||
+      identity?.user_metadata?.full_name ||
+      identity?.email ||
+      "Ark",
+  ).trim();
+
+  return {
+    id: identity?.id || "superadmin-local",
+    auth_user_id: identity?.id || "superadmin-local",
+    email: identity?.email || "",
+    account_name: accountProfile?.account_name || null,
+    account_code: accountProfile?.account_code || null,
+    first_name: identity?.user_metadata?.first_name || displayName.split(" ")[0] || "Ark",
+    last_name:
+      identity?.user_metadata?.last_name || displayName.split(" ").slice(1).join(" ") || "Superadmin",
+    role: "superadmin",
+    project_site_id: projectSite?.id || null,
+    project_site_name: projectSite?.name || null,
+    position_id: null,
+    position_title: "Superadmin",
+    page_access: [],
+  };
+};
+
+const isSuperadminSessionUser = async (sessionUser) => {
+  if (!sessionUser) return false;
+  if (isSuperadminIdentity(sessionUser)) return true;
+  return Boolean(await fetchSuperadminAccountProfile(sessionUser));
+};
+
+const mapSupabaseAuthError = (authError) => {
+  const message = String(authError?.message || "");
+  const lowered = message.toLowerCase();
+
+  if (lowered.includes("email not confirmed")) {
+    return "Your email is not confirmed yet. Check your inbox or use the activation link again.";
+  }
+
+  if (lowered.includes("invalid login credentials")) {
+    return "Invalid email or password.";
+  }
+
+  if (lowered.includes("too many requests")) {
+    return "Too many login attempts. Please wait and try again.";
+  }
+
+  return message || "Failed to log in.";
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -142,50 +238,40 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
 
     try {
-      const rawSession = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (rawSession) {
-        const parsed = JSON.parse(rawSession);
-        if (parsed?.email?.toLowerCase() === SUPERADMIN_EMAIL) {
-          setUser(parsed);
-          setIsAuthenticated(true);
-        } else {
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-          setUser(null);
-          setIsAuthenticated(false);
-        }
+      const { data: sessionResult } = await supabase.auth.getSession();
+      const sessionUser = sessionResult?.session?.user;
+
+      if (!sessionUser) {
+        setUser(null);
+        setIsAuthenticated(false);
+      } else if (await isSuperadminSessionUser(sessionUser)) {
+        const superadminProfile = await fetchSuperadminAccountProfile(sessionUser);
+        setUser(buildSuperadminAuthUser(sessionUser, null, superadminProfile));
+        setIsAuthenticated(true);
       } else {
-        const { data: sessionResult } = await supabase.auth.getSession();
-        const sessionUser = sessionResult?.session?.user;
+        const employeeRow = await fetchEmployeeByAuthId(sessionUser.id);
 
-        if (!sessionUser) {
+        if (!employeeRow) {
+          await supabase.auth.signOut();
           setUser(null);
           setIsAuthenticated(false);
-        } else {
-          const employeeRow = await fetchEmployeeByAuthId(sessionUser.id);
-
-          if (!employeeRow) {
-            await supabase.auth.signOut();
-            setUser(null);
-            setIsAuthenticated(false);
-            setAuthError({ type: "user_not_registered" });
-            return;
-          }
-
-          if (employeeRow.is_account_active === false) {
-            await supabase.auth.signOut();
-            setUser(null);
-            setIsAuthenticated(false);
-            setAuthError({ type: "account_deactivated" });
-            return;
-          }
-
-          setUser(buildEmployeeAuthUser(sessionUser, employeeRow));
-          setIsAuthenticated(true);
+          setAuthError({ type: "user_not_registered" });
+          return;
         }
+
+        if (employeeRow.is_account_active === false) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setIsAuthenticated(false);
+          setAuthError({ type: "account_deactivated" });
+          return;
+        }
+
+        setUser(buildEmployeeAuthUser(sessionUser, employeeRow));
+        setIsAuthenticated(true);
       }
     } catch (error) {
       console.error("Failed to restore auth session:", error);
-      localStorage.removeItem(AUTH_STORAGE_KEY);
       setUser(null);
       setIsAuthenticated(false);
     } finally {
@@ -195,34 +281,10 @@ export const AuthProvider = ({ children }) => {
 
   const login = async ({ email, password, projectSite }) => {
     const normalizedEmail = (email || "").trim().toLowerCase();
-    const normalizedPassword = (password || "").trim();
+    const normalizedPassword = String(password ?? "");
 
     if (!projectSite?.id) {
       return { success: false, message: "Please select a project site." };
-    }
-
-    if (
-      normalizedEmail === SUPERADMIN_EMAIL &&
-      normalizedPassword === SUPERADMIN_PASSWORD
-    ) {
-      const authUser = {
-        id: "superadmin-local",
-        email: SUPERADMIN_EMAIL,
-        first_name: "Ark",
-        last_name: "Superadmin",
-        role: "super admin",
-        project_site_id: projectSite.id,
-        project_site_name: projectSite.name,
-        position_id: null,
-        position_title: "Superadmin",
-        page_access: [], // Empty means full access for superadmin
-      };
-
-      setUser(authUser);
-      setIsAuthenticated(true);
-      setAuthError(null);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authUser));
-      return { success: true };
     }
 
     try {
@@ -234,7 +296,7 @@ export const AuthProvider = ({ children }) => {
       if (authError) {
         return {
           success: false,
-          message: "Invalid email or password.",
+          message: mapSupabaseAuthError(authError),
         };
       }
 
@@ -244,6 +306,15 @@ export const AuthProvider = ({ children }) => {
           success: false,
           message: "Login failed. Please try again.",
         };
+      }
+
+      if (await isSuperadminSessionUser(sessionUser)) {
+        const superadminProfile = await fetchSuperadminAccountProfile(sessionUser);
+        setUser(buildSuperadminAuthUser(sessionUser, projectSite, superadminProfile));
+        setIsAuthenticated(true);
+        setAuthError(null);
+
+        return { success: true };
       }
 
       const employeeRow = await fetchEmployeeByAuthId(sessionUser.id);
@@ -271,7 +342,6 @@ export const AuthProvider = ({ children }) => {
       });
       setIsAuthenticated(true);
       setAuthError(null);
-      localStorage.removeItem(AUTH_STORAGE_KEY);
 
       return { success: true };
     } catch (error) {
@@ -287,7 +357,6 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setAuthError(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
     await supabase.auth.signOut();
   };
 

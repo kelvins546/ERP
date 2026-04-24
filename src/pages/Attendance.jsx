@@ -1,36 +1,317 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
-import { Plus, X, Clock, MapPin, AlertCircle } from "lucide-react";
+import { Plus, X, Clock, MapPin, AlertCircle, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/AuthContext";
+
+function getGeofenceConfig() {
+  const envLat = Number(import.meta.env.VITE_GEOFENCE_LAT);
+  const envLon = Number(import.meta.env.VITE_GEOFENCE_LON);
+  const envRadius = Number(import.meta.env.VITE_GEOFENCE_RADIUS_METERS ?? 0);
+  const envOk =
+    Number.isFinite(envLat) &&
+    Number.isFinite(envLon) &&
+    Number.isFinite(envRadius) &&
+    envRadius > 0;
+  if (envOk) {
+    return { lat: envLat, lon: envLon, radiusMeters: envRadius, source: "env" };
+  }
+  return null;
+}
+
+function haversineMeters(a, b) {
+  const R = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
+}
+
+function getCurrentCoords() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation not supported"));
+      return;
+    }
+
+    let watchId = null;
+    let timeoutId = null;
+    let best = null;
+
+    const finish = (result, error) => {
+      if (watchId != null) navigator.geolocation.clearWatch(watchId);
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      watchId = null;
+      timeoutId = null;
+      if (result) resolve(result);
+      else reject(error || new Error("Unable to fetch location"));
+    };
+
+    const isFiniteNumber = (n) => typeof n === "number" && Number.isFinite(n);
+
+    const handlePos = (p) => {
+      const lat = p?.coords?.latitude;
+      const lon = p?.coords?.longitude;
+      const accuracyMeters = p?.coords?.accuracy;
+      if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) return;
+
+      const candidate = {
+        lat,
+        lon,
+        accuracyMeters: isFiniteNumber(accuracyMeters) ? accuracyMeters : null,
+      };
+
+      if (!best) {
+        best = candidate;
+      } else {
+        const bestAcc = best.accuracyMeters ?? Number.POSITIVE_INFINITY;
+        const candAcc = candidate.accuracyMeters ?? Number.POSITIVE_INFINITY;
+        if (candAcc < bestAcc) best = candidate;
+      }
+
+      // Resolve early if we have a good GPS fix.
+      if (candidate.accuracyMeters != null && candidate.accuracyMeters <= 30) {
+        finish(candidate);
+      }
+    };
+
+    const handleErr = (err) => {
+      // If we already captured at least one point, prefer returning it.
+      if (best) {
+        finish(best);
+        return;
+      }
+      finish(null, err);
+    };
+
+    timeoutId = window.setTimeout(() => {
+      if (best) finish(best);
+      else finish(null, new Error("Location timeout"));
+    }, 15000);
+
+    watchId = navigator.geolocation.watchPosition(handlePos, handleErr, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000,
+    });
+  });
+}
 
 // --- THE MODAL (CREATE LOG) ---
 function LogModal({ onClose, onSaved }) {
+  const { user } = useAuth();
+  const employeeId = user?.id || null;
+
   const [form, setForm] = useState({
-    employee_id: "", // Changed from employee_name to ID
     type: "time_in",
     log_date: new Date().toISOString().split("T")[0],
     notes: "",
   });
+  const [geofence, setGeofence] = useState(() => getGeofenceConfig());
+  const [coords, setCoords] = useState(null);
+  const [accuracyMeters, setAccuracyMeters] = useState(null);
+  const [geoStatus, setGeoStatus] = useState("idle");
+  const [withinGeofence, setWithinGeofence] = useState(null);
+  const [distanceMeters, setDistanceMeters] = useState(null);
+  const [cameraStatus, setCameraStatus] = useState("idle");
+  const [cameraError, setCameraError] = useState(null);
+  const [photoBlob, setPhotoBlob] = useState(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
   const [saving, setSaving] = useState(false);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const checkLocation = async () => {
+    setGeoStatus("loading");
+    setWithinGeofence(null);
+    setDistanceMeters(null);
+    setAccuracyMeters(null);
+    try {
+      const gf = getGeofenceConfig();
+      setGeofence(gf);
+      const c = await getCurrentCoords();
+      setCoords({ lat: c.lat, lon: c.lon });
+      setAccuracyMeters(typeof c.accuracyMeters === "number" ? c.accuracyMeters : null);
+      setGeoStatus("ok");
+      if (!gf) {
+        setWithinGeofence(null);
+      } else {
+        const distance = haversineMeters(
+          { lat: gf.lat, lon: gf.lon },
+          { lat: c.lat, lon: c.lon },
+        );
+        setDistanceMeters(distance);
+
+        // Account for GPS uncertainty to reduce false "outside" readings.
+        // If the accuracy circle overlaps the geofence, treat it as within.
+        const acc = typeof c.accuracyMeters === "number" ? c.accuracyMeters : 0;
+        const effectiveDistance = Math.max(0, distance - acc);
+        setWithinGeofence(effectiveDistance <= gf.radiusMeters);
+      }
+    } catch (e) {
+      setGeoStatus("error");
+      setCoords(null);
+      setDistanceMeters(null);
+      setAccuracyMeters(null);
+      setWithinGeofence(false);
+    }
+  };
+
+
+  useEffect(() => {
+    checkLocation();
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+      if (streamRef.current) {
+        for (const t of streamRef.current.getTracks()) t.stop();
+        streamRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startCamera = async () => {
+    setCameraError(null);
+    setCameraStatus("loading");
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera is not supported in this browser.");
+      }
+      // Stop any previous stream first
+      if (streamRef.current) {
+        for (const t of streamRef.current.getTracks()) t.stop();
+        streamRef.current = null;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      const v = videoRef.current;
+      if (v) {
+        v.srcObject = stream;
+        await v.play();
+      }
+      setCameraStatus("ready");
+    } catch (e) {
+      setCameraStatus("error");
+      setCameraError(e?.message || "Camera permission required.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      for (const t of streamRef.current.getTracks()) t.stop();
+      streamRef.current = null;
+    }
+    const v = videoRef.current;
+    if (v) v.srcObject = null;
+    setCameraStatus("idle");
+  };
+
+  const capturePhoto = async () => {
+    const v = videoRef.current;
+    if (!v) return;
+    const w = v.videoWidth || 1280;
+    const h = v.videoHeight || 720;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(v, 0, 0, w, h);
+
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.9),
+    );
+    if (!blob) {
+      setCameraError("Failed to capture photo.");
+      return;
+    }
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setPhotoBlob(blob);
+    setPhotoPreviewUrl(URL.createObjectURL(blob));
+  };
+
+  const clearPhoto = () => {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setPhotoBlob(null);
+    setPhotoPreviewUrl(null);
+  };
 
   const save = async () => {
     setSaving(true);
+    let uploadedPath = null;
     try {
       // Create accurate timestamps for the database
       const timestamp = new Date().toISOString();
 
+      if (!employeeId) {
+        throw new Error("No current user found. Please log in again.");
+      }
+
+      const gf = getGeofenceConfig();
+      setGeofence(gf);
+
+      if (!gf) {
+        throw new Error(
+          "Geofence is not configured. Set it in .env (VITE_GEOFENCE_LAT/LON) or use 'Set geofence here'.",
+        );
+      }
+      if (geoStatus !== "ok" || !coords) {
+        throw new Error("GPS location is required to log attendance.");
+      }
+      if (withinGeofence !== true) {
+        throw new Error(
+          "You must be within the configured geofence to log attendance.",
+        );
+      }
+      if (!photoBlob) {
+        throw new Error("A camera photo is required as proof of attendance.");
+      }
+
+      const bucket =
+        import.meta.env.VITE_ATTENDANCE_PROOFS_BUCKET || "attendance-proofs";
+      const fileExt = photoBlob.type?.split("/").pop() || "jpg";
+      const safeName = `${timestamp.replaceAll(":", "-")}_${Math.random()
+        .toString(36)
+        .slice(2)}.${fileExt}`;
+      uploadedPath = `${employeeId}/${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(uploadedPath, photoBlob, {
+          contentType: photoBlob.type || "image/jpeg",
+          upsert: false,
+        });
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(uploadedPath);
+
       // Supabase Insert
       const { error } = await supabase.from("attendance_logs").insert([
         {
-          employee_id: form.employee_id || null,
+          employee_id: employeeId,
           type: form.type, // Maps perfectly to the 'attendance_type' ENUM in SQL
+          log_date: form.log_date,
           device_timestamp: timestamp,
           calculated_server_time: timestamp,
-          // Notes is not in your SQL schema, but we pass it anyway.
-          // You'll need to add a 'notes' text column to the database if you want to keep this!
-          // notes: form.notes
+          latitude: coords.lat,
+          longitude: coords.lon,
+          is_within_geofence: true,
+          proof_photo_url: publicUrl,
         },
       ]);
 
@@ -39,6 +320,11 @@ function LogModal({ onClose, onSaved }) {
     } catch (error) {
       console.error("Error saving log:", error.message);
       alert("Failed to save: " + error.message);
+      if (uploadedPath) {
+        const bucket =
+          import.meta.env.VITE_ATTENDANCE_PROOFS_BUCKET || "attendance-proofs";
+        await supabase.storage.from(bucket).remove([uploadedPath]);
+      }
     } finally {
       setSaving(false);
     }
@@ -54,16 +340,138 @@ function LogModal({ onClose, onSaved }) {
           </button>
         </div>
         <div className="p-5 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-slate-700">
+                  Location / Geofence
+                </div>
+                {!geofence ? (
+                  <div className="text-xs text-red-600 mt-0.5">
+                    Geofence not configured. Set VITE_GEOFENCE_LAT/LON.
+                  </div>
+                ) : geoStatus === "loading" ? (
+                  <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking GPS…
+                  </div>
+                ) : geoStatus === "ok" ? (
+                  <div className="text-xs text-slate-600 mt-0.5">
+                    {withinGeofence ? (
+                      <span className="text-green-700">Within geofence</span>
+                    ) : (
+                      <span className="text-red-600">Outside geofence</span>
+                    )}
+                    {geofence ? (
+                      <span className="text-slate-500">
+                        {" "}
+                        · Radius {Math.round(geofence.radiusMeters)}m
+                      </span>
+                    ) : null}
+                    {Number.isFinite(distanceMeters) ? (
+                      <span className="text-slate-500">
+                        {" "}
+                        · Distance {Math.round(distanceMeters)}m
+                      </span>
+                    ) : null}
+                    {typeof accuracyMeters === "number" ? (
+                      <span className="text-slate-500">
+                        {" "}
+                        · Accuracy ±{Math.round(accuracyMeters)}m
+                      </span>
+                    ) : null}
+                    {coords ? (
+                      <span className="text-slate-500">
+                        {" "}
+                        ({coords.lat.toFixed(5)}, {coords.lon.toFixed(5)})
+                      </span>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="text-xs text-red-600 mt-0.5">
+                    GPS permission required.
+                  </div>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8"
+                onClick={checkLocation}
+              >
+                Re-check
+              </Button>
+            </div>
+          </div>
+
           <div>
             <label className="text-xs font-medium text-slate-600">
-              Employee ID (UUID)
+              Proof Photo (Camera Only)
             </label>
-            <Input
-              className="mt-1"
-              value={form.employee_id}
-              onChange={(e) => set("employee_id", e.target.value)}
-              placeholder="Enter Employee UUID..."
-            />
+            <div className="mt-2 space-y-3">
+              {cameraError ? (
+                <div className="text-xs text-red-600">{cameraError}</div>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 gap-2"
+                  onClick={startCamera}
+                  disabled={cameraStatus === "loading"}
+                >
+                  <Camera className="w-4 h-4" />
+                  {cameraStatus === "ready" ? "Camera on" : "Start camera"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8"
+                  onClick={stopCamera}
+                  disabled={cameraStatus !== "ready"}
+                >
+                  Stop
+                </Button>
+                <Button
+                  type="button"
+                  className="h-8"
+                  onClick={capturePhoto}
+                  disabled={cameraStatus !== "ready"}
+                >
+                  Capture
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8"
+                  onClick={clearPhoto}
+                  disabled={!photoBlob}
+                >
+                  Clear
+                </Button>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 overflow-hidden bg-black/5">
+                <video
+                  ref={videoRef}
+                  className="w-full max-h-56 object-cover"
+                  playsInline
+                  muted
+                />
+              </div>
+            </div>
+            {photoPreviewUrl ? (
+              <div className="mt-3">
+                <img
+                  src={photoPreviewUrl}
+                  alt="Attendance proof"
+                  className="w-full max-h-56 object-cover rounded-xl border border-slate-200"
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <div>
+            {/* Employee is derived from the currently logged-in user */}
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600">Type</label>
@@ -104,7 +512,17 @@ function LogModal({ onClose, onSaved }) {
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={saving || !form.employee_id}>
+          <Button
+            onClick={save}
+            disabled={
+              saving ||
+              !employeeId ||
+              !photoBlob ||
+              geoStatus === "loading" ||
+              !geofence ||
+              withinGeofence !== true
+            }
+          >
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>
@@ -203,6 +621,7 @@ export default function Attendance() {
                   "Time",
                   "Geofence",
                   "Late",
+                  "Proof",
                   "Notes",
                 ].map((h) => (
                   <th
@@ -217,7 +636,7 @@ export default function Attendance() {
             <tbody className="divide-y divide-slate-100">
               {logs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400">
+                  <td colSpan={8} className="text-center py-12 text-slate-400">
                     No logs found for this date.
                   </td>
                 </tr>
@@ -271,6 +690,20 @@ export default function Attendance() {
                         </span>
                       ) : (
                         <span className="text-slate-300 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {l.proof_photo_url ? (
+                        <a
+                          href={l.proof_photo_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          View
+                        </a>
+                      ) : (
+                        <span className="text-slate-300">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">

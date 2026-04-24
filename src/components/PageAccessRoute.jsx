@@ -40,7 +40,7 @@ export default function PageAccessRoute({ fallback = <DefaultFallback /> }) {
     if (!isAuthenticated) return;
 
     // Superadmin has full access
-    if (user?.role === 'super admin') return;
+    if (user?.role === 'superadmin') return;
 
     // Dashboard is always accessible
     if (location.pathname === '/') return;
@@ -70,7 +70,7 @@ export default function PageAccessRoute({ fallback = <DefaultFallback /> }) {
   }
 
   // Superadmin, dashboard, or user with page access
-  if (user?.role === 'super admin' || location.pathname === '/' || hasPageAccess(user?.page_access, location.pathname)) {
+  if (user?.role === 'superadmin' || location.pathname === '/' || hasPageAccess(user?.page_access, location.pathname)) {
     return <Outlet />;
   }
 

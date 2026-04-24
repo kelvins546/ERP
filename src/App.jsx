@@ -67,6 +67,7 @@ import JournalEntries from "./features/accounting/pages/JournalEntries";
 import FinancialStatements from "./features/accounting/pages/FinancialStatements";
 import AccountsPayable from "./features/accounting/pages/AccountsPayable";
 import PublicJobView from "./pages/PublicJobView";
+import ActivateAccount from "./pages/ActivateAccount";
 
 const AppContent = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated } =
@@ -75,7 +76,10 @@ const AppContent = () => {
   const navigate = useNavigate();
 
   // Detect if the user is on a public page (like a job posting) so we don't block them
-  const isPublicRoute = location.pathname.startsWith("/jobs/") || location.pathname === "/login";
+  const isPublicRoute =
+    location.pathname.startsWith("/jobs/") ||
+    location.pathname === "/login" ||
+    location.pathname.startsWith("/activate-account");
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -107,6 +111,7 @@ const AppContent = () => {
       {/* PUBLIC ROUTES (No Sidebar, No Login Needed) */}
       {/* ========================================== */}
       <Route path="/login" element={<Login />} />
+      <Route path="/activate-account" element={<ActivateAccount />} />
       <Route path="/jobs/:id" element={<PublicJobView />} />
 
       {/* ========================================== */}

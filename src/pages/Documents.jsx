@@ -3,6 +3,13 @@ import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
 import { Plus, Trash2, X, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const docTypes = [
   "Resume",
@@ -103,17 +110,21 @@ function DocModal({ onClose, onSaved }) {
             <label className="text-xs font-medium text-slate-600">
               Document Type
             </label>
-            <select
-              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+            <Select
               value={form.document_type}
-              onChange={(e) => set("document_type", e.target.value)}
+              onValueChange={(value) => set("document_type", value)}
             >
-              {docTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="mt-1 w-full border-slate-200 bg-white text-sm">
+                <SelectValue placeholder="Select document type" />
+              </SelectTrigger>
+              <SelectContent>
+                {docTypes.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600">File *</label>
@@ -235,18 +246,22 @@ export default function Documents() {
           onChange={(e) => setEmpFilter(e.target.value)}
           className="flex-1 bg-white"
         />
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 bg-white min-w-[200px]"
+        <Select
+          value={typeFilter || "all"}
+          onValueChange={(value) => setTypeFilter(value === "all" ? "" : value)}
         >
-          <option value="">All Document Types</option>
-          {docTypes.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full sm:w-[220px] border-slate-200 bg-white text-sm text-slate-600">
+            <SelectValue placeholder="All Document Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Document Types</SelectItem>
+            {docTypes.map((t) => (
+              <SelectItem key={t} value={t}>
+                {t}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (

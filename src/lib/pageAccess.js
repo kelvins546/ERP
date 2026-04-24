@@ -104,3 +104,12 @@ export const hasPageAccess = (userPageAccess, path) => {
       accessPath.startsWith(path + "/")
   );
 };
+
+/**
+ * Check if user can access a page
+ * Superadmins automatically have access to everything
+ */
+export const canAccessPage = (isSuperAdmin, userPageAccess, path) => {
+  if (isSuperAdmin) return true;
+  return hasPageAccess(userPageAccess, path);
+};

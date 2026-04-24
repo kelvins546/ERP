@@ -1,6 +1,13 @@
   import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/api/base44Client";
 import { Search, Users, ChevronDown } from "lucide-react";
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
 
 const ACTIVE_STATUSES = ["regular", "probationary", "contractual"];
 const POSITION_LINK_TABLE_CANDIDATES = [
@@ -288,18 +295,22 @@ export default function OrgChart() {
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <select
-              value={selectedDepartmentFilter}
-              onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            <Select
+              value={selectedDepartmentFilter || "all"}
+              onValueChange={(value) => setSelectedDepartmentFilter(value === "all" ? "" : value)}
             >
-              <option value="">All Departments</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full sm:w-[240px] bg-white border-slate-300 text-sm focus:ring-2 focus:ring-blue-500">
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept.id} value={String(dept.id)}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

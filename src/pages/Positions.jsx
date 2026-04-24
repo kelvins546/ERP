@@ -3,6 +3,13 @@ import { supabase } from "@/api/base44Client";
 import { Plus, Edit, Trash2, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ALL_PAGES, getPagesBySection } from "@/lib/pageAccess";
 import {
   AlertDialog,
@@ -375,40 +382,56 @@ function PosModal({
             <label className="text-xs font-medium text-slate-600">
               Department{departmentLinkMode !== "none" ? " *" : ""}
             </label>
-            <select
-              className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${
-                showError("department") ? "border-red-500" : "border-slate-200"
-              }`}
+            <Select
               value={
-                departmentLinkMode === "id"
-                  ? form.department_id || ""
-                  : form.department_name || ""
+                (departmentLinkMode === "id"
+                  ? form.department_id
+                  : form.department_name) || "__none__"
               }
-              onChange={(e) => {
+              onValueChange={(value) => {
+                if (value === "__none__") {
+                  set("department_id", "");
+                  set("department_name", "");
+                  return;
+                }
+
                 if (departmentLinkMode === "id") {
-                  set("department_id", e.target.value);
-                  const selected = departments.find((d) => d.id === e.target.value);
+                  set("department_id", value);
+                  const selected = departments.find((d) => String(d.id) === String(value));
                   set("department_name", selected?.name || "");
                 } else if (departmentLinkMode === "name") {
-                  set("department_name", e.target.value);
+                  set("department_name", value);
                 }
               }}
               disabled={departmentLinkMode === "none"}
             >
-              <option value="">
-                {departmentLinkMode === "none"
-                  ? "No department link column found"
-                  : "Select department"}
-              </option>
-              {departments.map((dept) => (
-                <option
-                  key={dept.id}
-                  value={departmentLinkMode === "id" ? dept.id : dept.name}
-                >
-                  {dept.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                className={`mt-1 w-full ${showError("department") ? "border-red-500" : "border-slate-200"}`}
+              >
+                <SelectValue
+                  placeholder={
+                    departmentLinkMode === "none"
+                      ? "No department link column found"
+                      : "Select department"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">
+                  {departmentLinkMode === "none"
+                    ? "No department link column found"
+                    : "Select department"}
+                </SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem
+                    key={dept.id}
+                    value={String(departmentLinkMode === "id" ? dept.id : dept.name)}
+                  >
+                    {dept.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {showError("department") && (
               <p className="text-xs text-red-600 mt-1">{errors.department}</p>
             )}

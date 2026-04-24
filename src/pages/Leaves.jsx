@@ -3,6 +3,7 @@ import { supabase } from "@/api/base44Client"; // <-- Clean Supabase import
 import { Plus, X, CheckCircle, XCircle, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/AuthContext";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -48,7 +49,7 @@ const formatEmployeeLabel = (employee) => {
 const makeEmployeeKey = (employee) => employee?.id || employee?.employee_id || "";
 
 // --- THE MODAL (CREATE & UPDATE) ---
-function LeaveModal({ leave, employees, onClose, onSaved }) {
+function LeaveModal({ leave, employees, onClose, onSaved, canCreate }) {
   const employeeOptions = employees || [];
   const [form, setForm] = useState({
     employee_id: "",
@@ -74,6 +75,11 @@ function LeaveModal({ leave, employees, onClose, onSaved }) {
   );
 
   const save = async () => {
+    if (!leave?.id && !canCreate) {
+      alert("Super admin can only review/respond to leave requests.");
+      return;
+    }
+
     const today = getTodayYMD();
     const effectiveStartDate = form.start_date || "";
     const effectiveEndDate = form.end_date || "";
@@ -339,6 +345,9 @@ function LeaveDetailsModal({ leave, onClose, onEdit }) {
 
 // --- THE MAIN PAGE (READ & QUICK APPROVE) ---
 export default function Leaves() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
+
   const [leaves, setLeaves] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -435,15 +444,17 @@ export default function Leaves() {
             Submit, review, and approve leave applications.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditLeave(null);
-            setShowModal(true);
-          }}
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" /> New Request
-        </Button>
+        {!isSuperAdmin && (
+          <Button
+            onClick={() => {
+              setEditLeave(null);
+              setShowModal(true);
+            }}
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" /> New Request
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -615,6 +626,7 @@ export default function Leaves() {
             setShowModal(false);
             load();
           }}
+          canCreate={!isSuperAdmin}
         />
       )}
 

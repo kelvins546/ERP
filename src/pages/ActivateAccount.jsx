@@ -26,6 +26,7 @@ export default function ActivateAccount() {
   const [invite, setInvite] = useState(null);
   const [tokenHash, setTokenHash] = useState("");
   const [error, setError] = useState("");
+  const [activationNotice, setActivationNotice] = useState("");
   const [success, setSuccess] = useState(false);
   const [form, setForm] = useState({
     password: "",
@@ -35,6 +36,8 @@ export default function ActivateAccount() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const token = useMemo(() => params.get("token") || "", [params]);
+  const activationFunctionUrl =
+    import.meta.env.VITE_ACTIVATE_EMPLOYEE_ACCOUNT_FN_URL || "";
   const passwordChecks = useMemo(() => evaluatePassword(form.password), [form.password]);
   const passwordScore = useMemo(() => Object.values(passwordChecks).filter(Boolean).length, [passwordChecks]);
   const isPasswordValid = useMemo(() => passwordScore === 5, [passwordScore]);
@@ -89,6 +92,37 @@ export default function ActivateAccount() {
     validateInvite();
   }, [token]);
 
+  const activateViaEdgeFunction = async () => {
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+    const response = await fetch(activationFunctionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+      },
+      body: JSON.stringify({
+        token,
+        password: form.password,
+      }),
+    });
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(payload?.error || "Failed to activate account.");
+    }
+
+    if (!payload?.success) {
+      throw new Error(payload?.error || "Failed to activate account.");
+    }
+  };
+
   const submit = async (event) => {
     event.preventDefault();
 
@@ -104,8 +138,15 @@ export default function ActivateAccount() {
 
     setSubmitting(true);
     setError("");
+    setActivationNotice("");
 
     try {
+      if (activationFunctionUrl) {
+        await activateViaEdgeFunction();
+        setSuccess(true);
+        return;
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: invite.email,
         password: form.password,
@@ -124,8 +165,8 @@ export default function ActivateAccount() {
         !authData?.user?.email_confirmed_at;
 
       if (requiresEmailConfirmation) {
-        throw new Error(
-          "Supabase email confirmation is enabled. Disable Authentication > Providers > Email > Confirm email, then retry activation.",
+        setActivationNotice(
+          "Activation complete. Please confirm your email in Supabase before your first sign in.",
         );
       }
 
@@ -219,6 +260,11 @@ export default function ActivateAccount() {
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 Your account has been activated. You can now sign in.
               </div>
+              {activationNotice ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                  {activationNotice}
+                </div>
+              ) : null}
               <Link to="/login" className="block">
                 <Button className="w-full bg-[#2E6F40] hover:bg-[#265B34]">Go To Login</Button>
               </Link>

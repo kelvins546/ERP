@@ -52,6 +52,38 @@ function CustomConfirm({ isOpen, title, message, onCancel, onConfirm }) {
   );
 }
 
+// --- MATH ENGINE FOR UI PREVIEW ---
+// --- MATH ENGINE FOR UI PREVIEW ---
+const computeAutoDeductionsPreview = (basicSalary, frequency) => {
+  const monthlyBasic =
+    frequency === "monthly" ? Number(basicSalary) : Number(basicSalary) * 2;
+
+  let sss = 0;
+  if (monthlyBasic > 0) {
+    const cappedSalary = Math.min(monthlyBasic, 30000);
+    sss = cappedSalary * 0.045; // 4.5% Employee share
+  }
+
+  // FIXED PHILHEALTH LOGIC (With Minimum Floor)
+  let philhealth = 0;
+  if (monthlyBasic > 0) {
+    if (monthlyBasic <= 10000) {
+      philhealth = 250; // Minimum fixed employee share for 10k and below
+    } else {
+      const cappedSalary = Math.min(monthlyBasic, 100000);
+      philhealth = cappedSalary * 0.025; // 2.5% Employee share
+    }
+  }
+
+  let pagibig = monthlyBasic > 1500 ? 200 : 0;
+
+  return {
+    sss: Math.round(sss * 100) / 100,
+    philhealth: Math.round(philhealth * 100) / 100,
+    pagibig: pagibig,
+  };
+};
+
 // --- THE MODAL (CREATE & UPDATE) ---
 function ProfileModal({ profile, employeesList, onClose, onSaved }) {
   const [form, setForm] = useState({
@@ -112,7 +144,7 @@ function ProfileModal({ profile, employeesList, onClose, onSaved }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
           <div className="flex items-center justify-between p-5 border-b">
             <h2 className="text-lg font-semibold">
@@ -379,71 +411,118 @@ export default function SalaryProfiles() {
                       </td>
                     </tr>
                   ) : (
-                    profiles.map((p) => (
-                      <tr
-                        key={p.id}
-                        className="hover:bg-slate-50 transition-colors"
-                      >
-                        <td className="px-4 py-3 text-sm font-medium text-slate-900">
-                          {p.employees ? (
-                            `${p.employees.first_name} ${p.employees.last_name}`
-                          ) : (
-                            <span className="text-red-400">
-                              ID: {p.employee_id?.substring(0, 8)}...
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                          ₱
-                          {Number(
-                            p.basic_salary || p.basic_pay || 0,
-                          ).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-600 capitalize">
-                          {(p.pay_frequency || "").replace("_", " ")}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-600">
-                          {p.sss_contribution > 0 ? (
-                            `₱${Number(p.sss_contribution).toLocaleString()}`
-                          ) : (
-                            <span className="text-slate-300 italic">Auto</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-600">
-                          {p.philhealth_contribution > 0 ? (
-                            `₱${Number(p.philhealth_contribution).toLocaleString()}`
-                          ) : (
-                            <span className="text-slate-300 italic">Auto</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-600">
-                          {p.pagibig_contribution > 0 ? (
-                            `₱${Number(p.pagibig_contribution).toLocaleString()}`
-                          ) : (
-                            <span className="text-slate-300 italic">Auto</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setEditProfile(p);
-                                setShowModal(true);
-                              }}
-                              className="p-1.5 text-slate-400 hover:text-[#2E6F40] hover:bg-[#2E6F40]/10 rounded transition-colors"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => triggerDelete(p.id)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    profiles.map((p) => {
+                      const autoDeductions = computeAutoDeductionsPreview(
+                        p.basic_salary || p.basic_pay || 0,
+                        p.pay_frequency,
+                      );
+
+                      return (
+                        <tr
+                          key={p.id}
+                          className="hover:bg-slate-50 transition-colors"
+                        >
+                          <td className="px-4 py-3 text-sm font-medium text-slate-900">
+                            {p.employees ? (
+                              `${p.employees.first_name} ${p.employees.last_name}`
+                            ) : (
+                              <span className="text-red-400">
+                                ID: {p.employee_id?.substring(0, 8)}...
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800">
+                            ₱
+                            {Number(
+                              p.basic_salary || p.basic_pay || 0,
+                            ).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600 capitalize">
+                            {(p.pay_frequency || "").replace("_", " ")}
+                          </td>
+
+                          <td className="px-4 py-3 text-sm text-slate-600">
+                            {p.sss_contribution > 0 ? (
+                              <span className="font-bold text-[#2E6F40]">
+                                ₱{Number(p.sss_contribution).toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-slate-600">
+                                ₱
+                                {autoDeductions.sss.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}{" "}
+                                <span className="text-slate-400 italic text-[10px]">
+                                  (Auto/mo)
+                                </span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600">
+                            {p.philhealth_contribution > 0 ? (
+                              <span className="font-bold text-[#2E6F40]">
+                                ₱
+                                {Number(
+                                  p.philhealth_contribution,
+                                ).toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-slate-600">
+                                ₱
+                                {autoDeductions.philhealth.toLocaleString(
+                                  undefined,
+                                  { minimumFractionDigits: 2 },
+                                )}{" "}
+                                <span className="text-slate-400 italic text-[10px]">
+                                  (Auto/mo)
+                                </span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600">
+                            {p.pagibig_contribution > 0 ? (
+                              <span className="font-bold text-[#2E6F40]">
+                                ₱
+                                {Number(
+                                  p.pagibig_contribution,
+                                ).toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-slate-600">
+                                ₱
+                                {autoDeductions.pagibig.toLocaleString(
+                                  undefined,
+                                  { minimumFractionDigits: 2 },
+                                )}{" "}
+                                <span className="text-slate-400 italic text-[10px]">
+                                  (Auto/mo)
+                                </span>
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditProfile(p);
+                                  setShowModal(true);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-[#2E6F40] hover:bg-[#2E6F40]/10 rounded transition-colors"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => triggerDelete(p.id)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

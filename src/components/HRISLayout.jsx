@@ -187,7 +187,7 @@ function NavItem({ item, collapsed, userRole, pageAccess }) {
   const Icon = item.icon;
 
   // Check if user is superadmin (has full access)
-  const isSuperAdmin = userRole === "super admin";
+  const isSuperAdmin = userRole === "superadmin";
 
   // For single-level items (no children)
   if (!item.children) {
@@ -281,7 +281,15 @@ export default function HRISLayout() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email || "User";
+  const isSuperAdmin = user?.role === "superadmin";
+  const rawDisplayName = String(
+    user?.account_name || [user?.first_name, user?.last_name].filter(Boolean).join(" "),
+  ).trim();
+  const looksLikeEmail = String(rawDisplayName || "").includes("@");
+  const displayName =
+    isSuperAdmin && (!rawDisplayName || looksLikeEmail)
+      ? "Superadmin"
+      : rawDisplayName || user?.email || "User";
   const displayRole = user?.role || "Employee";
   const initials = displayName
     .split(" ")
@@ -331,7 +339,7 @@ export default function HRISLayout() {
                 <p className="text-white font-bold text-lg leading-tight">
                   Ark Industries
                 </p>
-                <p className="text-white/70 text-xs mt-0.5">Superadmin</p>
+                <p className="text-white/70 text-xs mt-0.5"> </p>
               </div>
             </div>
           )}

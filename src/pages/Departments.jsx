@@ -4,6 +4,13 @@ import { Plus, Search, Edit, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -201,40 +208,56 @@ function DeptModal({
             <label className="text-xs font-medium text-slate-600">
               Project Site{projectSiteLinkMode !== "none" ? " *" : ""}
             </label>
-            <select
-              className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${
-                showError("project_site") ? "border-red-500" : "border-slate-200"
-              }`}
+            <Select
               value={
-                projectSiteLinkMode === "id"
-                  ? form.project_site_id || ""
-                  : form.project_site_name || ""
+                (projectSiteLinkMode === "id"
+                  ? form.project_site_id
+                  : form.project_site_name) || "__none__"
               }
-              onChange={(e) => {
+              onValueChange={(value) => {
+                if (value === "__none__") {
+                  set("project_site_id", "");
+                  set("project_site_name", "");
+                  return;
+                }
+
                 if (projectSiteLinkMode === "id") {
-                  set("project_site_id", e.target.value);
-                  const selected = projectSites.find((s) => s.id === e.target.value);
+                  set("project_site_id", value);
+                  const selected = projectSites.find((s) => String(s.id) === String(value));
                   set("project_site_name", selected?.name || "");
                 } else if (projectSiteLinkMode === "name") {
-                  set("project_site_name", e.target.value);
+                  set("project_site_name", value);
                 }
               }}
               disabled={projectSiteLinkMode === "none"}
             >
-              <option value="">
-                {projectSiteLinkMode === "none"
-                  ? "No project site link column found"
-                  : "Select project site"}
-              </option>
-              {projectSites.map((site) => (
-                <option
-                  key={site.id}
-                  value={projectSiteLinkMode === "id" ? site.id : site.name}
-                >
-                  {site.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                className={`mt-1 w-full ${showError("project_site") ? "border-red-500" : "border-slate-200"}`}
+              >
+                <SelectValue
+                  placeholder={
+                    projectSiteLinkMode === "none"
+                      ? "No project site link column found"
+                      : "Select project site"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">
+                  {projectSiteLinkMode === "none"
+                    ? "No project site link column found"
+                    : "Select project site"}
+                </SelectItem>
+                {projectSites.map((site) => (
+                  <SelectItem
+                    key={site.id}
+                    value={String(projectSiteLinkMode === "id" ? site.id : site.name)}
+                  >
+                    {site.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {showError("project_site") && (
               <p className="text-xs text-red-600 mt-1">{errors.project_site}</p>
             )}

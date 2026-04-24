@@ -726,20 +726,14 @@ export default function Applicants() {
                             a.status === "rejected" ? (
                               <select
                                 className="px-2 py-1 text-[10px] xl:text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg transition-colors ml-auto outline-none cursor-pointer"
-                                onChange={async (e) => {
+                                onChange={(e) => {
                                   const newStatus = e.target.value;
-                                  if (newStatus) {
-                                    try {
-                                      await supabase
-                                        .from("applicants")
-                                        .update({ status: newStatus })
-                                        .eq("id", a.id);
-                                      load();
-                                    } catch (err) {
-                                      console.error("Failed to move applicant", err);
-                                      alert("Failed to move applicant.");
-                                    }
+                                  if (newStatus === "interviewing") {
+                                    setConfirmAction({ type: "accept", applicant: a });
+                                  } else if (newStatus === "offered") {
+                                    setConfirmAction({ type: "move", applicant: a, targetStatus: newStatus });
                                   }
+                                  e.target.value = "";
                                 }}
                                 value=""
                               >
@@ -788,9 +782,9 @@ export default function Applicants() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8 text-center animate-in zoom-in-95 duration-200">
             <div
-              className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-5 ${confirmAction.type === "accept" ? "bg-[#2E6F40]/10" : "bg-red-50"}`}
+              className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-5 ${confirmAction.type === "accept" || confirmAction.type === "move" ? "bg-[#2E6F40]/10" : "bg-red-50"}`}
             >
-              {confirmAction.type === "accept" ? (
+              {confirmAction.type === "accept" || confirmAction.type === "move" ? (
                 <CheckCircle className="w-8 h-8 text-[#2E6F40]" />
               ) : (
                 <XCircle className="w-8 h-8 text-red-600" />
@@ -799,18 +793,20 @@ export default function Applicants() {
             <h3 className="text-xl font-bold text-slate-900 mb-2">
               {confirmAction.type === "accept"
                 ? "Invite to Interview?"
+                : confirmAction.type === "move"
+                ? "Move Applicant?"
                 : "Decline Applicant?"}
             </h3>
             <p className="text-sm text-slate-500 mb-8 leading-relaxed">
-              Are you sure you want to {confirmAction.type}{" "}
+              Are you sure you want to {confirmAction.type === "move" ? "move" : confirmAction.type}{" "}
               <strong className="text-slate-800">
                 {confirmAction.applicant.first_name}{" "}
                 {confirmAction.applicant.last_name}
               </strong>
-              ?
-              {confirmAction.type === "accept"
-                ? " They will be moved to the Interviewing stage and sent an email invite."
-                : " They will be moved to the Rejected stage."}
+              {confirmAction.type === "move" ? ` to the ${confirmAction.targetStatus.replace("_", " ")} stage?` : "?"}
+              {confirmAction.type === "accept" && " They will be moved to the Interviewing stage and sent an email invite."}
+              {confirmAction.type === "decline" && " They will be moved to the Rejected stage."}
+              {confirmAction.type === "move" && confirmAction.targetStatus === "offered" && " A new or existing job offer will be set to pending."}
             </p>
 
             {confirmAction.type === "accept" && (
@@ -903,8 +899,40 @@ export default function Applicants() {
               </Button>
               <Button
                 disabled={sendingInvite}
-                className={`rounded-xl px-6 transition-all ${confirmAction.type === "accept" ? "bg-[#2E6F40] hover:bg-[#235330] text-white shadow-md" : "bg-red-600 hover:bg-red-700 text-white shadow-md"}`}
+                className={`rounded-xl px-6 transition-all ${confirmAction.type === "accept" || confirmAction.type === "move" ? "bg-[#2E6F40] hover:bg-[#235330] text-white shadow-md" : "bg-red-600 hover:bg-red-700 text-white shadow-md"}`}
                 onClick={async () => {
+                  if (confirmAction.type === "move") {
+                    setSendingInvite(true);
+                    try {
+                      await supabase
+                        .from("applicants")
+                        .update({ status: confirmAction.targetStatus })
+                        .eq("id", confirmAction.applicant.id);
+                      
+                      if (confirmAction.targetStatus === "offered") {
+                        const { data: latestOffer } = await supabase.from('job_offers').select('id').eq('applicant_id', confirmAction.applicant.id).order('created_at', { ascending: false }).limit(1);
+                        if (latestOffer && latestOffer.length > 0) {
+                           await supabase.from('job_offers').update({ status: 'pending' }).eq('id', latestOffer[0].id);
+                        } else {
+                           await supabase.from('job_offers').insert([{
+                              applicant_id: confirmAction.applicant.id,
+                              status: 'pending',
+                              offered_salary: confirmAction.applicant.expected_salary || 0
+                           }]);
+                        }
+                      }
+
+                      load();
+                      setConfirmAction(null);
+                    } catch (e) {
+                      console.error(e);
+                      alert("Failed to move applicant: " + e.message);
+                    } finally {
+                      setSendingInvite(false);
+                    }
+                    return;
+                  }
+
                   const status =
                     confirmAction.type === "accept"
                       ? "interviewing"
@@ -958,6 +986,20 @@ export default function Applicants() {
                       .from("applicants")
                       .update({ status })
                       .eq("id", confirmAction.applicant.id);
+
+                    if (confirmAction.type === "decline") {
+                      if (confirmAction.applicant.status === "interviewing") {
+                         const { data: latestInt } = await supabase.from('interviews').select('id').eq('applicant_id', confirmAction.applicant.id).order('created_at', { ascending: false }).limit(1);
+                         if (latestInt && latestInt.length > 0) {
+                            await supabase.from('interviews').update({ status: 'failed' }).eq('id', latestInt[0].id);
+                         }
+                      } else if (confirmAction.applicant.status === "offered") {
+                         const { data: latestOffer } = await supabase.from('job_offers').select('id').eq('applicant_id', confirmAction.applicant.id).order('created_at', { ascending: false }).limit(1);
+                         if (latestOffer && latestOffer.length > 0) {
+                            await supabase.from('job_offers').update({ status: 'declined' }).eq('id', latestOffer[0].id);
+                         }
+                      }
+                    }
 
                     load();
                     setConfirmAction(null);

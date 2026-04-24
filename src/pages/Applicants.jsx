@@ -566,6 +566,10 @@ export default function Applicants() {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [employees, setEmployees] = useState([]);
 
+  // --- NEW STATES FOR FILTERING AND SEARCHING ---
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilters, setActiveFilters] = useState([]);
+
   const load = async () => {
     try {
       setLoading(true);
@@ -595,11 +599,22 @@ export default function Applicants() {
     load();
   }, []);
 
-  const byStage = (stage) => applicants.filter((a) => a.status === stage);
+  // --- FILTERING LOGIC ---
+  const filteredApplicants = applicants.filter((a) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      `${a.first_name} ${a.last_name} ${a.email} ${a.phone} ${a.job_postings?.post_title} ${a.job_postings?.title} ${a.source} ${a.status}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  const displayedStages = activeFilters.length === 0 ? stages : activeFilters;
+  const byStage = (stage) => filteredApplicants.filter((a) => a.status === stage);
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             Applicant Tracking
@@ -613,23 +628,101 @@ export default function Applicants() {
             setEditApplicant(null);
             setShowModal(true);
           }}
-          className="gap-2 px-5 py-2.5 rounded-xl shadow-md bg-[#2E6F40] hover:bg-[#235330] text-white font-semibold transition-all hover:scale-[1.02]"
+          className="gap-2 px-5 py-2.5 rounded-xl shadow-md bg-[#2E6F40] hover:bg-[#235330] text-white font-semibold transition-all hover:scale-[1.02] w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" /> Add Applicant
         </Button>
       </div>
 
+      {/* --- SEARCH AND FILTER CONTROLS --- */}
+      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="relative w-full lg:w-96 shrink-0">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinelinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <Input
+            type="text"
+            placeholder="Search name, email, role..."
+            className="pl-10 w-full rounded-xl border-slate-200 focus-visible:ring-[#2E6F40] shadow-sm transition-all"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto justify-start lg:justify-end">
+          <button
+            onClick={() => setActiveFilters([])}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeFilters.length === 0
+                ? "bg-slate-800 text-white shadow-md scale-105"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            All Stages
+          </button>
+          {stages.map((stage) => (
+            <button
+              key={stage}
+              onClick={() => {
+                if (activeFilters.includes(stage)) {
+                  setActiveFilters(activeFilters.filter((s) => s !== stage));
+                } else {
+                  const newFilters = [...activeFilters, stage];
+                  if (newFilters.length >= 5) {
+                    setActiveFilters([]);
+                  } else {
+                    setActiveFilters(newFilters);
+                  }
+                }
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all ${
+                activeFilters.includes(stage)
+                  ? "bg-[#2E6F40] text-white shadow-md scale-105"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {stage.replace("_", " ")}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
+        <div className={`grid grid-cols-1 ${
+          activeFilters.length === 0 ? "lg:grid-cols-5" : 
+          activeFilters.length === 1 ? "lg:grid-cols-1" :
+          activeFilters.length === 2 ? "lg:grid-cols-2" :
+          activeFilters.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"
+        } gap-4 pb-4 pt-2`}>
+          {(activeFilters.length === 0 ? [1, 2, 3, 4, 5] : activeFilters).map((i) => (
+            <div key={i} className="flex flex-col space-y-3 min-w-0">
+              <div className="flex items-center justify-between mb-4 px-1">
+                <div className="w-24 h-6 bg-slate-200 animate-pulse rounded-full" />
+                <div className="w-6 h-6 bg-slate-200 animate-pulse rounded-md" />
+              </div>
+              {[1, 2, 3].map((j) => (
+                <div key={j} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm animate-pulse h-[140px] w-full" />
+              ))}
+            </div>
+          ))}
         </div>
       ) : (
-        /* CHANGED: We now use a responsive grid instead of a scrolling flex container */
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 pb-4 pt-2">
-          {stages.map((stage) => (
-            /* CHANGED: Removed the fixed w-[22rem] so it compresses automatically */
-            <div key={stage} className="flex flex-col min-w-0">
-              <div className="flex items-center justify-between mb-4 px-1">
+        <div className={`grid grid-cols-1 ${
+          activeFilters.length === 0 ? "lg:grid-cols-5" : 
+          activeFilters.length === 1 ? "lg:grid-cols-1 md:grid-cols-2 xl:grid-cols-3" :
+          activeFilters.length === 2 ? "lg:grid-cols-2" :
+          activeFilters.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"
+        } gap-4 pb-4 pt-2 items-start`}>
+          {displayedStages.map((stage) => (
+            <div key={stage} className="flex flex-col min-w-0 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between mb-4 px-1 sticky top-0 z-10 bg-slate-50/80 backdrop-blur-md py-2 rounded-lg">
                 <span
                   className={`text-[11px] xl:text-xs font-bold px-2 xl:px-3 py-1 rounded-full capitalize tracking-wider border truncate ${stageColors[stage] || "bg-slate-100"}`}
                 >
@@ -640,10 +733,11 @@ export default function Applicants() {
                 </span>
               </div>
               <div className="space-y-3">
-                {byStage(stage).map((a) => (
+                {byStage(stage).map((a, index) => (
                   <div
                     key={a.id}
-                    className="bg-white rounded-2xl border border-slate-200 p-3 xl:p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col"
+                    className="bg-white rounded-2xl border border-slate-200 p-3 xl:p-4 shadow-sm hover:shadow-md transition-all flex flex-col animate-in slide-in-from-bottom-4 fade-in duration-500 fill-mode-both"
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div

@@ -265,6 +265,9 @@ export default function JobOffers() {
   const [actionModal, setActionModal] = useState(null);
   const navigate = useNavigate();
 
+  // --- NEW STATE FOR SEARCHING ---
+  const [searchTerm, setSearchTerm] = useState("");
+
   const load = async () => {
     try {
       setLoading(true);
@@ -304,9 +307,15 @@ export default function JobOffers() {
     load();
   }, []);
 
+  // --- FILTERING LOGIC ---
+  const filteredOffers = offers.filter(o => {
+    const searchStr = `${o.applicants?.first_name} ${o.applicants?.last_name} ${o.position_title || ""} ${o.applicants?.job_postings?.post_title || ""} ${o.applicants?.job_postings?.title || ""} ${o.status} ${o.offered_salary}`.toLowerCase();
+    return searchStr.includes(searchTerm.toLowerCase());
+  });
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             Job Offers
@@ -320,28 +329,54 @@ export default function JobOffers() {
             setEditOffer(null);
             setShowModal(true);
           }}
-          className="gap-2 bg-[#2E6F40] hover:bg-[#235330] text-white rounded-xl shadow-md transition-all hover:scale-[1.02] px-5"
+          className="gap-2 bg-[#2E6F40] hover:bg-[#235330] text-white rounded-xl shadow-md transition-all hover:scale-[1.02] px-5 w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" /> Draft Offer
         </Button>
       </div>
 
+      {/* --- SEARCH CONTROL --- */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div className="relative w-full max-w-md">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <Input
+            type="text"
+            placeholder="Search offers by name, role, salary..."
+            className="pl-10 w-full rounded-xl border-slate-200 focus-visible:ring-[#2E6F40] shadow-sm transition-all"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="w-8 h-8 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm animate-pulse h-[250px] w-full" />
+          ))}
         </div>
       ) : (
         <div className="space-y-4">
-          {offers.length === 0 ? (
-            <div className="text-center py-16 text-slate-400 font-medium bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">
-              No job offers drafted yet.
+          {filteredOffers.length === 0 ? (
+            <div className="text-center py-16 text-slate-400 font-medium bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl animate-in fade-in">
+              {searchTerm ? "No job offers found matching your search." : "No job offers drafted yet."}
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {offers.map((o) => (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filteredOffers.map((o, index) => (
                 <div
                   key={o.id}
-                  className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between gap-4 cursor-pointer hover:shadow-md hover:border-[#2E6F40]/30 transition-all"
+                  className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between gap-4 cursor-pointer hover:shadow-md hover:border-[#2E6F40]/30 transition-all animate-in slide-in-from-bottom-4 fade-in duration-500 fill-mode-both"
+                  style={{ animationDelay: `${index * 50}ms` }}
                   onClick={() => {
                     setEditOffer(o);
                     setShowModal(true);

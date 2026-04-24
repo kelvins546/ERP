@@ -182,24 +182,35 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
         supabase.from("employees").select("project_site_id").limit(1),
       ]);
 
-      let posRes = await supabase
-        .from("positions")
-        .select("id, title")
-        .order("title");
+      let posRes = null;
+      const positionSelectCandidates = [
+        "id, title, department_id, department_name",
+        "id, title, department_id",
+        "id, title, department_name",
+        "id, title",
+      ];
 
-      if (!posRes.error) {
-        posRes = {
-          ...posRes,
-          data: (posRes.data || []).map((row) => ({
-            ...row,
-            department_id: null,
-            department_name: null,
-          })),
-        };
+      for (const selectCols of positionSelectCandidates) {
+        const probe = await supabase
+          .from("positions")
+          .select(selectCols)
+          .order("title");
+
+        if (!probe.error) {
+          posRes = {
+            ...probe,
+            data: (probe.data || []).map((row) => ({
+              ...row,
+              department_id: row.department_id || null,
+              department_name: row.department_name || null,
+            })),
+          };
+          break;
+        }
       }
 
       if (!deptRes.error) setDepartments(deptRes.data || []);
-      if (!posRes.error) setPositions(posRes.data || []);
+      if (posRes && !posRes.error) setPositions(posRes.data || []);
       if (!siteRes.error) setProjectSites(siteRes.data || []);
 
       if (!projectIdProbe.error) {
@@ -381,9 +392,7 @@ export default function EmployeeModal({ employee, onClose, onSaved }) {
       return false;
     });
 
-    // If department mapping exists but this department has no direct match,
-    // fall back to all positions so users can still proceed.
-    return matches.length > 0 ? matches : positions;
+    return matches;
   }, [
     positions,
     hasDepartmentSelection,

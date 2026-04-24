@@ -21,8 +21,52 @@ export async function hashInviteToken(token) {
   return toHex(digest);
 }
 
+function normalizeBaseUrl(candidate) {
+  if (!candidate) return "";
+
+  try {
+    const url = new URL(String(candidate));
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
+function isLocalHost(origin) {
+  if (!origin) return false;
+
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+function resolveInviteBaseUrl() {
+  const envUrls = [
+    normalizeBaseUrl(import.meta.env.VITE_PUBLIC_SITE_URL),
+    normalizeBaseUrl(import.meta.env.VITE_BASE44_APP_BASE_URL),
+  ].filter(Boolean);
+
+  const firstNonLocalEnv = envUrls.find((url) => !isLocalHost(url));
+  if (firstNonLocalEnv) return firstNonLocalEnv;
+
+  const browserOrigin =
+    typeof window !== "undefined" ? normalizeBaseUrl(window.location.origin) : "";
+
+  if (browserOrigin && !isLocalHost(browserOrigin)) {
+    return browserOrigin;
+  }
+
+  if (envUrls.length > 0) return envUrls[0];
+  if (browserOrigin) return browserOrigin;
+
+  return "http://localhost:5173";
+}
+
 function buildInviteLink(token) {
-  const baseUrl = import.meta.env.VITE_BASE44_APP_BASE_URL || window.location.origin;
+  const baseUrl = resolveInviteBaseUrl();
   const url = new URL("/activate-account", baseUrl);
   url.searchParams.set("token", token);
   return url.toString();

@@ -17,7 +17,9 @@ const isSuperadminIdentity = (identity) => {
 const fetchSuperadminAccountProfile = async (sessionUser) => {
   if (!sessionUser) return null;
 
-  const normalizedEmail = String(sessionUser.email || "").trim().toLowerCase();
+  const normalizedEmail = String(sessionUser.email || "")
+    .trim()
+    .toLowerCase();
   const probes = [];
 
   if (normalizedEmail) {
@@ -50,7 +52,11 @@ const fetchSuperadminAccountProfile = async (sessionUser) => {
   return null;
 };
 
-const buildSuperadminAuthUser = (identity, projectSite = null, accountProfile = null) => {
+const buildSuperadminAuthUser = (
+  identity,
+  projectSite = null,
+  accountProfile = null,
+) => {
   const displayName = String(
     accountProfile?.account_name ||
       identity?.user_metadata?.name ||
@@ -65,9 +71,12 @@ const buildSuperadminAuthUser = (identity, projectSite = null, accountProfile = 
     email: identity?.email || "",
     account_name: accountProfile?.account_name || null,
     account_code: accountProfile?.account_code || null,
-    first_name: identity?.user_metadata?.first_name || displayName.split(" ")[0] || "Ark",
+    first_name:
+      identity?.user_metadata?.first_name || displayName.split(" ")[0] || "Ark",
     last_name:
-      identity?.user_metadata?.last_name || displayName.split(" ").slice(1).join(" ") || "Superadmin",
+      identity?.user_metadata?.last_name ||
+      displayName.split(" ").slice(1).join(" ") ||
+      "Superadmin",
     role: "superadmin",
     project_site_id: projectSite?.id || null,
     project_site_name: projectSite?.name || null,
@@ -146,7 +155,9 @@ export const AuthProvider = ({ children }) => {
 
     const withActive = await supabase
       .from("employees")
-      .select("id, first_name, last_name, email, status, project_site_id, is_account_active, position_id, position_ids")
+      .select(
+        "id, first_name, last_name, email, status, project_site_id, is_account_active, position_id, position_ids",
+      )
       .eq("auth_id", authUserId)
       .maybeSingle();
 
@@ -163,7 +174,9 @@ export const AuthProvider = ({ children }) => {
 
       const withoutActive = await supabase
         .from("employees")
-        .select("id, first_name, last_name, email, status, project_site_id, position_id, position_ids")
+        .select(
+          "id, first_name, last_name, email, status, project_site_id, position_id, position_ids",
+        )
         .eq("auth_id", authUserId)
         .maybeSingle();
 
@@ -198,7 +211,10 @@ export const AuthProvider = ({ children }) => {
       : [];
 
     // Add primary position if not in multi-role array
-    if (employeeRow.position_id && !positionIdsToFetch.includes(employeeRow.position_id)) {
+    if (
+      employeeRow.position_id &&
+      !positionIdsToFetch.includes(employeeRow.position_id)
+    ) {
       positionIdsToFetch.push(employeeRow.position_id);
     }
 
@@ -245,7 +261,8 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setIsAuthenticated(false);
       } else if (await isSuperadminSessionUser(sessionUser)) {
-        const superadminProfile = await fetchSuperadminAccountProfile(sessionUser);
+        const superadminProfile =
+          await fetchSuperadminAccountProfile(sessionUser);
         setUser(buildSuperadminAuthUser(sessionUser, null, superadminProfile));
         setIsAuthenticated(true);
       } else {
@@ -288,10 +305,11 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const { data: authResult, error: authError } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: normalizedPassword,
-      });
+      const { data: authResult, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password: normalizedPassword,
+        });
 
       if (authError) {
         return {
@@ -309,8 +327,11 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (await isSuperadminSessionUser(sessionUser)) {
-        const superadminProfile = await fetchSuperadminAccountProfile(sessionUser);
-        setUser(buildSuperadminAuthUser(sessionUser, projectSite, superadminProfile));
+        const superadminProfile =
+          await fetchSuperadminAccountProfile(sessionUser);
+        setUser(
+          buildSuperadminAuthUser(sessionUser, projectSite, superadminProfile),
+        );
         setIsAuthenticated(true);
         setAuthError(null);
 

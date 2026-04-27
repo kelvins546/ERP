@@ -133,16 +133,33 @@ export default function ESSSecurity() {
   const start2FASetup = async () => {
     setMfaError("");
     setMfaSetupStep("enrolling");
+
     try {
+      // 1. THE FIX: Dig into the '.all' array to find the hidden ghost attempts!
+      const { data: existingFactors } = await supabase.auth.mfa.listFactors();
+      const unverifiedFactors =
+        existingFactors?.all?.filter((f) => f.status === "unverified") || [];
+
+      // Wipe the ghosts from the database
+      for (const factor of unverifiedFactors) {
+        await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      }
+
+      // 2. Create the fresh, new factor safely
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
+        issuer: "Ark Industries",
+        friendlyName: `Authenticator-${Date.now()}`,
       });
+
       if (error) throw error;
+
       setFactorId(data.id);
       setQrCode(data.totp.qr_code);
       setSecretCode(data.totp.secret);
       setMfaSetupStep("verifying");
     } catch (error) {
+      console.error("MFA Error:", error);
       setMfaError(error.message);
       setMfaSetupStep("idle");
     }
@@ -503,9 +520,11 @@ export default function ESSSecurity() {
                 <div className="flex items-center justify-between p-5 border-b bg-slate-50">
                   <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                     <ShieldCheck className="w-5 h-5 text-[#2E6F40]" />
-                    {mfaSetupStep === "verifying"
-                      ? "Set Up Authenticator"
-                      : "Authorize Removal"}
+                    {mfaSetupStep === "enrolling"
+                      ? "Generating Security Key"
+                      : mfaSetupStep === "verifying"
+                        ? "Set Up Authenticator"
+                        : "Authorize Removal"}
                   </h2>
                   <button
                     onClick={() => setMfaSetupStep("idle")}
@@ -521,6 +540,19 @@ export default function ESSSecurity() {
                 <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   {mfaError}
+                </div>
+              )}
+
+              {/* Loading State for Enrollment */}
+              {mfaSetupStep === "enrolling" && (
+                <div className="flex flex-col items-center justify-center py-10 space-y-4 text-center">
+                  <div className="w-10 h-10 border-4 border-[#2E6F40]/30 border-t-[#2E6F40] rounded-full animate-spin"></div>
+                  <p className="text-sm font-medium text-slate-600">
+                    Generating your secure QR code...
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Please do not close this window.
+                  </p>
                 </div>
               )}
 
@@ -546,7 +578,8 @@ export default function ESSSecurity() {
                       </code>
                       <button
                         onClick={copyToClipboard}
-                        className="p-1.5 bg-white border border-slate-200 rounded-md text-slate-500 hover:text-[#2E6F40] shadow-sm"
+                        className="p-1.5 bg-white border border-slate-200 rounded-md text-slate-500 hover:text-[#2E6F40] hover:border-[#2E6F40] transition-colors shadow-sm"
+                        title="Copy Code"
                       >
                         {copied ? (
                           <CheckCircle2 className="w-4 h-4 text-[#2E6F40]" />

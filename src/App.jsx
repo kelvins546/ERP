@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
@@ -69,17 +70,54 @@ import AccountsPayable from "./features/accounting/pages/AccountsPayable";
 import PublicJobView from "./pages/PublicJobView";
 import ActivateAccount from "./pages/ActivateAccount";
 
+// ==========================================
+// EMPLOYEE SELF-SERVICE (ESS) IMPORTS
+// ==========================================
+import ESSLayout from "./components/employee/ESSLayout";
+import ESSDashboard from "./pages/employee/Dashboard";
+import ESSAttendance from "./pages/employee/Attendance";
+import ESSDirectory from "./pages/employee/Directory";
+import ESSPayrollBenefits from "./pages/employee/PayrollBenefits";
+import ESSRequests from "./pages/employee/Requests";
+import ESSSupport from "./pages/employee/Support";
+import ESSProfile from "./pages/employee/settings/Profile";
+import ESSSecurity from "./pages/employee/settings/Security";
+
 const AppContent = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated } =
-    useAuth();
+  const {
+    isLoadingAuth,
+    isLoadingPublicSettings,
+    authError,
+    isAuthenticated,
+    user,
+  } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Detect if the user is on a public page (like a job posting) so we don't block them
+  // Detect if the user is on a public page
   const isPublicRoute =
     location.pathname.startsWith("/jobs/") ||
     location.pathname === "/login" ||
     location.pathname.startsWith("/activate-account");
+
+  // ==========================================
+  // THE IRON-CLAD STRICT ROLE BOUNCER
+  // ==========================================
+  useEffect(() => {
+    if (isAuthenticated && user && !isPublicRoute) {
+      // Define what makes someone an admin (Superadmin OR has specific page access rights)
+      const isAdmin =
+        user.role === "superadmin" ||
+        (Array.isArray(user.page_access) && user.page_access.length > 0);
+
+      const isTryingToAccessAdmin = !location.pathname.startsWith("/portal");
+
+      // If a regular employee tries to access an Admin page, immediately kick them to the portal
+      if (!isAdmin && isTryingToAccessAdmin) {
+        navigate("/portal", { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, isPublicRoute, location.pathname, navigate]);
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -115,7 +153,21 @@ const AppContent = () => {
       <Route path="/jobs/:id" element={<PublicJobView />} />
 
       {/* ========================================== */}
-      {/* PRIVATE ROUTES (Has Sidebar, Needs Login)    */}
+      {/* EMPLOYEE PORTAL ROUTES (Needs Login, No Admin Checks) */}
+      {/* ========================================== */}
+      <Route path="/portal" element={<ESSLayout />}>
+        <Route index element={<ESSDashboard />} />
+        <Route path="attendance" element={<ESSAttendance />} />
+        <Route path="directory" element={<ESSDirectory />} />
+        <Route path="payroll-benefits" element={<ESSPayrollBenefits />} />
+        <Route path="requests" element={<ESSRequests />} />
+        <Route path="support" element={<ESSSupport />} />
+        <Route path="settings/profile" element={<ESSProfile />} />
+        <Route path="settings/security" element={<ESSSecurity />} />
+      </Route>
+
+      {/* ========================================== */}
+      {/* ADMIN / HR ROUTES (Has Sidebar, Needs Login & Access Checks) */}
       {/* ========================================== */}
       <Route element={<PageAccessRoute />}>
         <Route element={<HRISLayout />}>
@@ -154,7 +206,10 @@ const AppContent = () => {
           <Route path="/reports/payroll" element={<Reports />} />
           <Route path="/reports/attrition" element={<Reports />} />
 
-          <Route path="/procurement/suppliers" element={<SupplierManagement />} />
+          <Route
+            path="/procurement/suppliers"
+            element={<SupplierManagement />}
+          />
           <Route
             path="/procurement/material-requests"
             element={<MaterialRequests />}

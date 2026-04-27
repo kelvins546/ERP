@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { supabase } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import arkLogo from "@/assets/imgs/ark-logo.png";
@@ -16,7 +16,7 @@ import {
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, isAuthenticated, authError } = useAuth();
+  const { login, logout, isAuthenticated, authError, user } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,11 +27,89 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (isAuthenticated) {
+  // --- 2FA STATE ---
+  const [mfaPending, setMfaPending] = useState(false);
+  const [factorId, setFactorId] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaError, setMfaError] = useState("");
+  const [verifyingMfa, setVerifyingMfa] = useState(false);
+
+  // --- TRAFFIC COP LOGIC ---
+  const routeUser = (currentUser) => {
+    if (currentUser?.role === "superadmin") {
       navigate("/", { replace: true });
+    } else {
+      navigate("/portal", { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  };
+
+  // --- RECORD LOGIN HISTORY ---
+  const recordLoginHistory = async (userId) => {
+    try {
+      const ua = navigator.userAgent;
+      let device = "Web Browser";
+      if (/android/i.test(ua)) device = "Android Device";
+      else if (/iphone|ipad|ipod/i.test(ua)) device = "iOS Device";
+      else if (/windows/i.test(ua)) device = "Windows PC";
+      else if (/mac/i.test(ua)) device = "Mac";
+
+      await supabase.from("employee_login_history").insert([
+        {
+          employee_id: userId,
+          device_info: device,
+          ip_address: "Logged via Portal",
+          status: "success",
+        },
+      ]);
+    } catch (err) {
+      console.error("Failed to log history:", err);
+    }
+  };
+
+  // --- SECURITY INTERCEPTOR ---
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkSessionSecurity = async () => {
+      if (isAuthenticated && user) {
+        try {
+          const { data, error } =
+            await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (error) throw error;
+
+          if (data?.nextLevel === "aal2" && data?.currentLevel === "aal1") {
+            if (isMounted) {
+              setMfaPending(true);
+              const { data: factors } = await supabase.auth.mfa.listFactors();
+              const totpFactor = factors?.totp?.find(
+                (f) => f.status === "verified",
+              );
+              if (totpFactor) setFactorId(totpFactor.id);
+            }
+          } else {
+            if (isMounted) {
+              await recordLoginHistory(user.id);
+              routeUser(user);
+            }
+          }
+        } catch (err) {
+          console.error("MFA Check Error:", err);
+          if (isMounted) {
+            await recordLoginHistory(user.id);
+            routeUser(user);
+          }
+        }
+      }
+    };
+
+    if (!mfaPending) {
+      checkSessionSecurity();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, user, mfaPending, navigate]);
 
   useEffect(() => {
     const loadProjectSites = async () => {
@@ -56,17 +134,17 @@ export default function Login() {
   }, []);
 
   const selectedProjectSite = useMemo(() => {
-    return projectSites.find((site) => String(site.id) === String(projectSiteId));
+    return projectSites.find(
+      (site) => String(site.id) === String(projectSiteId),
+    );
   }, [projectSites, projectSiteId]);
 
   const authStateMessage = useMemo(() => {
     if (!authError?.type) return "";
-    if (authError.type === "account_deactivated") {
+    if (authError.type === "account_deactivated")
       return "Your account is terminated. Please contact HR admin.";
-    }
-    if (authError.type === "user_not_registered") {
+    if (authError.type === "user_not_registered")
       return "No employee record is linked to this account.";
-    }
     return "Authentication required. Please sign in.";
   }, [authError]);
 
@@ -74,20 +152,9 @@ export default function Login() {
     e.preventDefault();
     setError("");
 
-    if (!email.trim()) {
-      setError("Email is required.");
-      return;
-    }
-
-    if (!password.trim()) {
-      setError("Password is required.");
-      return;
-    }
-
-    if (!projectSiteId) {
-      setError("Please select a project site.");
-      return;
-    }
+    if (!email.trim()) return setError("Email is required.");
+    if (!password.trim()) return setError("Password is required.");
+    if (!projectSiteId) return setError("Please select a project site.");
 
     setSubmitting(true);
     const result = await login({
@@ -102,10 +169,40 @@ export default function Login() {
 
     if (!result.success) {
       setError(result.message || "Failed to log in.");
-      return;
     }
+  };
 
-    navigate("/", { replace: true });
+  const handleVerifyMFA = async (e) => {
+    e.preventDefault();
+    setMfaError("");
+    setVerifyingMfa(true);
+
+    try {
+      const challenge = await supabase.auth.mfa.challenge({ factorId });
+      if (challenge.error) throw challenge.error;
+
+      const verify = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challenge.data.id,
+        code: mfaCode,
+      });
+      if (verify.error) throw verify.error;
+
+      await recordLoginHistory(user.id);
+      routeUser(user);
+    } catch (err) {
+      setMfaError("Invalid 6-digit code. Please try again.");
+    } finally {
+      setVerifyingMfa(false);
+    }
+  };
+
+  const handleCancelMFA = async () => {
+    if (logout) await logout();
+    setMfaPending(false);
+    setMfaCode("");
+    setFactorId("");
+    setError("Login cancelled.");
   };
 
   return (
@@ -155,99 +252,161 @@ export default function Login() {
           </div>
 
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-slate-900">Login</h1>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {mfaPending ? "Two-Factor Authentication" : "Login"}
+            </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Use your authorized credentials to continue.
+              {mfaPending
+                ? "Enter your authenticator code."
+                : "Use your authorized credentials to continue."}
             </p>
           </div>
 
-          {authStateMessage ? (
+          {authStateMessage && !mfaPending && (
             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
               {authStateMessage}
             </div>
-          ) : null}
+          )}
 
-          {error ? (
+          {error && !mfaPending && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
             </div>
-          ) : null}
+          )}
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Email</label>
-              <Input
-                type="email"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-              />
-            </div>
+          {mfaPending ? (
+            <form className="space-y-4" onSubmit={handleVerifyMFA}>
+              <div className="text-center mb-6">
+                <ShieldCheck className="w-12 h-12 text-[#2E6F40] mx-auto mb-3" />
+                <p className="text-sm text-slate-600">
+                  Open your authenticator app and enter the 6-digit code to
+                  securely log in.
+                </p>
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Password</label>
-              <div className="relative">
+              {mfaError && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 text-center">
+                  {mfaError}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
                 <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  className="pr-10"
+                  type="text"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={mfaCode}
+                  onChange={(e) =>
+                    setMfaCode(e.target.value.replace(/[^0-9]/g, ""))
+                  }
+                  className="text-center text-3xl tracking-[0.5em] font-mono h-14 focus-visible:ring-[#2E6F40]"
+                  autoFocus
                 />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-[#2E6F40] hover:bg-[#235330] h-12 mt-2"
+                disabled={verifyingMfa || mfaCode.length !== 6}
+              >
+                {verifyingMfa ? "Verifying Identity..." : "Verify & Sign In"}
+              </Button>
+
+              <div className="text-center mt-4">
                 <button
                   type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute inset-y-0 right-0 px-3 text-slate-500 hover:text-slate-700"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={handleCancelMFA}
+                  className="text-sm text-slate-500 hover:text-slate-700 underline"
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
+                  Cancel and go back
                 </button>
               </div>
-            </div>
+            </form>
+          ) : (
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">
+                  Email
+                </label>
+                <Input
+                  type="email"
+                  placeholder="name@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Project Site</label>
-              <Select
-                value={projectSiteId}
-                onValueChange={setProjectSiteId}
-                disabled={loadingSites || projectSites.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      loadingSites
-                        ? "Loading project sites..."
-                        : projectSites.length
-                          ? "Select project site"
-                          : "No project sites found"
-                    }
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">
+                  Password
+                </label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    className="pr-10"
                   />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectSites.map((site) => (
-                    <SelectItem key={site.id} value={String(site.id)}>
-                      {site.name}
-                      {site.location ? ` - ${site.location}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 px-3 text-slate-500 hover:text-slate-700"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-[#2E6F40] hover:bg-[#265B34]"
-              disabled={submitting}
-            >
-              {submitting ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">
+                  Project Site
+                </label>
+                <Select
+                  value={projectSiteId}
+                  onValueChange={setProjectSiteId}
+                  disabled={loadingSites || projectSites.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        loadingSites
+                          ? "Loading project sites..."
+                          : projectSites.length
+                            ? "Select project site"
+                            : "No project sites found"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectSites.map((site) => (
+                      <SelectItem key={site.id} value={String(site.id)}>
+                        {site.name}
+                        {site.location ? ` - ${site.location}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-[#2E6F40] hover:bg-[#265B34]"
+                disabled={submitting}
+              >
+                {submitting ? "Authenticating..." : "Sign In"}
+              </Button>
+            </form>
+          )}
         </div>
       </div>
     </div>

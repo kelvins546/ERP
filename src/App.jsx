@@ -29,6 +29,7 @@ import Applicants from "./pages/Applicants";
 import Interviews from "./pages/Interviews";
 import JobOffers from "./pages/JobOffers";
 import Attendance from "./pages/Attendance";
+import PayPeriodAttendance from "./pages/PayPeriodAttendance"; // <-- Added Import
 import Leaves from "./pages/Leaves";
 import Overtime from "./pages/Overtime";
 import Holidays from "./pages/Holidays";
@@ -185,6 +186,11 @@ const AppContent = () => {
           <Route path="/interviews" element={<Interviews />} />
           <Route path="/job-offers" element={<JobOffers />} />
           <Route path="/attendance" element={<Attendance />} />
+          <Route
+            path="/pay-period-attendance"
+            element={<PayPeriodAttendance />}
+          />{" "}
+          {/* <-- Added Route */}
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/overtime" element={<Overtime />} />
           <Route path="/holidays" element={<Holidays />} />
@@ -198,14 +204,12 @@ const AppContent = () => {
           <Route path="/kpi" element={<KPI />} />
           <Route path="/disciplinary" element={<Disciplinary />} />
           <Route path="/promotions" element={<Promotions />} />
-
           {/* Support for both the old nested paths and the new query param paths for Reports */}
           <Route path="/reports" element={<Reports />} />
           <Route path="/reports/headcount" element={<Reports />} />
           <Route path="/reports/leaves" element={<Reports />} />
           <Route path="/reports/payroll" element={<Reports />} />
           <Route path="/reports/attrition" element={<Reports />} />
-
           <Route
             path="/procurement/suppliers"
             element={<SupplierManagement />}
@@ -254,7 +258,6 @@ const AppContent = () => {
             path="/accounting/accounts-payable"
             element={<AccountsPayable />}
           />
-
           <Route path="*" element={<PageNotFound />} />
         </Route>
       </Route>

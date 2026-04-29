@@ -53,7 +53,7 @@ const navItems = [
     icon: Users,
     children: [
       { label: "Employee Masterlist", path: "/employees" },
-      { label: "Project Sites", path: "/project-sites"},
+      { label: "Project Sites", path: "/project-sites" },
       { label: "Departments", path: "/departments" },
       { label: "Positions", path: "/positions" },
       { label: "Employee Tasks", path: "/tasks" },
@@ -87,10 +87,12 @@ const navItems = [
     label: "Payroll",
     icon: DollarSign,
     children: [
-      { label: "Payroll Periods", path: "/payroll" },
-      { label: "Payslips", path: "/payslips" },
       { label: "Salary Profiles", path: "/salary-profiles" },
-      { label: "Allowances", path: "/allowances" },
+      { label: "Pay Period Attendance", path: "/pay-period-attendance" },
+      { label: "Payroll Distribution", path: "/payroll" },
+
+      { label: "Benefits & Deductions", path: "/allowances" },
+      { label: "13th Month Pay", path: "/payslips" },
       { label: "Loans", path: "/loans" },
     ],
   },
@@ -283,7 +285,8 @@ export default function HRISLayout() {
 
   const isSuperAdmin = user?.role === "superadmin";
   const rawDisplayName = String(
-    user?.account_name || [user?.first_name, user?.last_name].filter(Boolean).join(" "),
+    user?.account_name ||
+      [user?.first_name, user?.last_name].filter(Boolean).join(" "),
   ).trim();
   const looksLikeEmail = String(rawDisplayName || "").includes("@");
   const displayName =
@@ -359,9 +362,9 @@ export default function HRISLayout() {
 
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {navItems.map((item) => (
-            <NavItem 
-              key={item.label} 
-              item={item} 
+            <NavItem
+              key={item.label}
+              item={item}
               collapsed={collapsed}
               userRole={user?.role}
               pageAccess={user?.page_access}
@@ -374,7 +377,7 @@ export default function HRISLayout() {
             onClick={() => setShowLogoutConfirm(true)}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              "text-white/80 hover:bg-white/10 hover:text-white"
+              "text-white/80 hover:bg-white/10 hover:text-white",
             )}
             title="Logout"
           >
@@ -421,8 +424,12 @@ export default function HRISLayout() {
                 {initials || "U"}
               </div>
               <div className="leading-tight">
-                <p className="text-sm font-semibold text-slate-900">{displayName}</p>
-                <p className="text-xs text-slate-500 capitalize">{displayRole}</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {displayName}
+                </p>
+                <p className="text-xs text-slate-500 capitalize">
+                  {displayRole}
+                </p>
               </div>
             </div>
           </div>

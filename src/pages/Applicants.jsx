@@ -12,10 +12,21 @@ import {
   Edit,
   FileText,
   ExternalLink,
+  Settings,
+  UserPlus,
+  Check,
+  Circle,
+  MoreHorizontal,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Search,
+  Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import emailjs from "@emailjs/browser";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // These statuses MUST match the 'applicant_status' ENUM in your SQL database
 const stages = ["applied", "interviewing", "offered", "rejected", "hired"];
@@ -550,6 +561,242 @@ function ApplicantModal({ applicant, onClose, onSaved }) {
   );
 }
 
+// --- ONBOARDING COMPONENTS ---
+function ViewOnboardingModal({ onboarding, onClose }) {
+  if (!onboarding) return null;
+  const completedCount = onboarding.steps.filter(s => s.status === 'completed').length;
+  const totalSteps = onboarding.steps.length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-white z-10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#2E6F40]/10 flex items-center justify-center text-[#2E6F40]">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Onboarding for {onboarding.onboardee}
+              </h2>
+              <p className="text-sm font-medium text-slate-500 mt-0.5 flex items-center gap-2">
+                <span>Officer: {onboarding.officer}</span>
+                <span>•</span>
+                <span>{onboarding.start_date} to {onboarding.end_date}</span>
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+          <div className="mb-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="text-sm font-bold text-slate-700">Start</div>
+            <div className="flex-1 mx-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-[#2E6F40] transition-all" style={{ width: `${(completedCount / totalSteps) * 100}%` }}></div>
+            </div>
+            <div className="text-sm font-bold text-[#2E6F40]">Completed ({completedCount}/{totalSteps})</div>
+          </div>
+
+          <div className="space-y-3">
+            {onboarding.steps.map((step, idx) => (
+              <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step.status === 'completed' ? 'bg-[#2E6F40] text-white' : 'bg-slate-100 text-slate-400'}`}>
+                    {step.status === 'completed' ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                  </div>
+                  <span className={`font-semibold ${step.status === 'completed' ? 'text-slate-900' : 'text-slate-500'}`}>{step.name}</span>
+                </div>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wider ${step.status === 'completed' ? 'bg-[#2E6F40]/10 text-[#2E6F40]' : 'bg-slate-100 text-slate-500'}`}>
+                  {step.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end p-5 border-t border-slate-100 bg-white shrink-0">
+          <Button onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl px-8 shadow-sm">
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PerformOnboardingModal({ onboarding, onClose, onUpdateStep, onAddStep }) {
+  const [confirmStep, setConfirmStep] = useState(null);
+  const [newStepName, setNewStepName] = useState("");
+  const [showAddStep, setShowAddStep] = useState(false);
+
+  if (!onboarding) return null;
+  const completedCount = onboarding.steps.filter(s => s.status === 'completed').length;
+  const totalSteps = onboarding.steps.length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-white z-10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+              <Settings className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Perform Onboarding: {onboarding.onboardee}
+              </h2>
+              <p className="text-sm font-medium text-slate-500 mt-0.5 flex items-center gap-2">
+                <span>Officer: {onboarding.officer}</span>
+                <span>•</span>
+                <span>{onboarding.start_date} to {onboarding.end_date}</span>
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+          <div className="mb-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="text-sm font-bold text-slate-700">Start</div>
+            <div className="flex-1 mx-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 transition-all" style={{ width: `${(completedCount / totalSteps) * 100}%` }}></div>
+            </div>
+            <div className="text-sm font-bold text-blue-600">Completed ({completedCount}/{totalSteps})</div>
+          </div>
+
+          <div className="space-y-3">
+            {onboarding.steps.map((step, idx) => (
+              <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => { if (step.status !== 'completed') setConfirmStep(step); }}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${step.status === 'completed' ? 'bg-[#2E6F40] text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600'}`}>
+                    {step.status === 'completed' ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                  </div>
+                  <span className={`font-semibold ${step.status === 'completed' ? 'text-slate-900' : 'text-slate-700'}`}>{step.name}</span>
+                </div>
+                {step.status !== 'completed' ? (
+                  <Button variant="outline" size="sm" className="text-xs h-7 rounded-lg">Mark Done</Button>
+                ) : (
+                  <span className="text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wider bg-[#2E6F40]/10 text-[#2E6F40]">
+                    Completed
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {showAddStep ? (
+            <div className="mt-4 p-4 bg-white rounded-xl border border-blue-200 shadow-sm flex items-center gap-3">
+              <Input value={newStepName} onChange={e => setNewStepName(e.target.value)} placeholder="New step name..." className="flex-1 focus-visible:ring-blue-500" autoFocus />
+              <Button onClick={() => { if (newStepName) { onAddStep(onboarding.id, newStepName); setNewStepName(""); setShowAddStep(false); } }} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">Add</Button>
+              <Button variant="ghost" onClick={() => setShowAddStep(false)}>Cancel</Button>
+            </div>
+          ) : (
+            <button onClick={() => setShowAddStep(true)} className="mt-4 w-full p-4 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center gap-2 text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 transition-all font-semibold">
+              <Plus className="w-5 h-5" /> Add Custom Step
+            </button>
+          )}
+        </div>
+
+        <div className="flex justify-end p-5 border-t border-slate-100 bg-white shrink-0">
+          <Button onClick={onClose} className="bg-slate-800 hover:bg-slate-900 text-white rounded-xl px-8 shadow-sm">
+            Done
+          </Button>
+        </div>
+      </div>
+
+      {confirmStep && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8 text-center animate-in zoom-in-95 duration-200">
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-5 bg-blue-50">
+              <CheckCircle className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Confirm Action</h3>
+            <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+              Are you sure the step <strong className="text-slate-800">"{confirmStep.name}"</strong> is properly performed to the employee?
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button variant="outline" className="rounded-xl px-6" onClick={() => setConfirmStep(null)}>Cancel</Button>
+              <Button className="rounded-xl px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-md" onClick={() => {
+                onUpdateStep(onboarding.id, confirmStep.id, 'completed');
+                setConfirmStep(null);
+              }}>
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReassignOfficerModal({ onboarding, employees, onClose, onConfirm }) {
+  const [newOfficerId, setNewOfficerId] = useState("");
+
+  if (!onboarding) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8 text-center animate-in zoom-in-95 duration-200">
+        <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-5 bg-purple-50">
+          <UserPlus className="w-8 h-8 text-purple-600" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900 mb-2">Reassign Officer</h3>
+        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+          Select a new onboarding officer for <strong className="text-slate-800">{onboarding.onboardee}</strong>. Current officer: {onboarding.officer}.
+        </p>
+        <div className="text-left mb-8">
+          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">New Officer</label>
+          <select className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600 transition-all bg-white" value={newOfficerId} onChange={e => setNewOfficerId(e.target.value)}>
+            <option value="">Select Employee...</option>
+            {employees.map(emp => (
+              <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-3 justify-center">
+          <Button variant="outline" className="rounded-xl px-6" onClick={onClose}>Cancel</Button>
+          <Button disabled={!newOfficerId} className="rounded-xl px-6 bg-purple-600 hover:bg-purple-700 text-white shadow-md" onClick={() => {
+            const officer = employees.find(e => e.id === newOfficerId);
+            onConfirm(onboarding.id, officer ? `${officer.first_name} ${officer.last_name}` : "Unknown");
+          }}>
+            Confirm Reassignment
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CancelOnboardingModal({ onboarding, onClose, onConfirm }) {
+  if (!onboarding) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8 text-center animate-in zoom-in-95 duration-200">
+        <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-5 bg-red-50">
+          <XCircle className="w-8 h-8 text-red-600" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900 mb-2">Cancel Onboarding</h3>
+        <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+          Are you sure you want to cancel the onboarding process for <strong className="text-slate-800">{onboarding.onboardee}</strong>? This action cannot be undone.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Button variant="outline" className="rounded-xl px-6" onClick={onClose}>Back</Button>
+          <Button className="rounded-xl px-6 bg-red-600 hover:bg-red-700 text-white shadow-md" onClick={() => onConfirm(onboarding.id)}>
+            Confirm Cancel
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- THE MAIN PAGE (READ & KANBAN LOGIC) ---
 export default function Applicants() {
   const [applicants, setApplicants] = useState([]);
@@ -566,9 +813,96 @@ export default function Applicants() {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [employees, setEmployees] = useState([]);
 
+  // --- ONBOARDING STATES ---
+  const [onboardings, setOnboardings] = useState([
+    {
+      id: 1,
+      employee_no: "EMP-2026-01",
+      onboardee: "Alex Mercer",
+      start_date: "2026-05-01",
+      end_date: "2026-05-15",
+      officer: "Sarah Connor",
+      steps: [
+        { id: 1, name: "Employee profile", status: "completed" },
+        { id: 2, name: "Job contract", status: "completed" },
+        { id: 3, name: "Discuss company policy", status: "pending" },
+        { id: 4, name: "Set Employee schedule", status: "pending" },
+        { id: 5, name: "Setup statutory forms", status: "pending" },
+        { id: 6, name: "Setup benefits and deductions", status: "pending" }
+      ]
+    },
+    {
+      id: 2,
+      employee_no: "EMP-2026-02",
+      onboardee: "Jordan Lee",
+      start_date: "2026-05-02",
+      end_date: "2026-05-16",
+      officer: "Sarah Connor",
+      steps: [
+        { id: 1, name: "Employee profile", status: "completed" },
+        { id: 2, name: "Job contract", status: "pending" },
+        { id: 3, name: "Discuss company policy", status: "pending" },
+        { id: 4, name: "Set Employee schedule", status: "pending" },
+        { id: 5, name: "Setup statutory forms", status: "pending" },
+        { id: 6, name: "Setup benefits and deductions", status: "pending" }
+      ]
+    }
+  ]);
+  const [viewOnboarding, setViewOnboarding] = useState(null);
+  const [performOnboarding, setPerformOnboarding] = useState(null);
+  const [reassignOnboarding, setReassignOnboarding] = useState(null);
+  const [cancelOnboarding, setCancelOnboarding] = useState(null);
+
   // --- NEW STATES FOR FILTERING AND SEARCHING ---
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilters, setActiveFilters] = useState([]);
+
+  // --- ONBOARDING FILTERING & SORTING STATES ---
+  const [onboardingSearchTerm, setOnboardingSearchTerm] = useState("");
+  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState("all");
+  const [onboardingSortConfig, setOnboardingSortConfig] = useState({ key: 'start_date', direction: 'desc' });
+
+  const handleOnboardingSort = (key) => {
+    let direction = 'asc';
+    if (onboardingSortConfig.key === key && onboardingSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setOnboardingSortConfig({ key, direction });
+  };
+
+  const handleUpdateStep = (onboardingId, stepId, newStatus) => {
+    setOnboardings(prev => prev.map(o => {
+      if (o.id === onboardingId) {
+        return {
+          ...o,
+          steps: o.steps.map(s => s.id === stepId ? { ...s, status: newStatus } : s)
+        };
+      }
+      return o;
+    }));
+  };
+
+  const handleAddStep = (onboardingId, stepName) => {
+    setOnboardings(prev => prev.map(o => {
+      if (o.id === onboardingId) {
+        return {
+          ...o,
+          steps: [...o.steps, { id: Date.now(), name: stepName, status: 'pending' }]
+        };
+      }
+      return o;
+    }));
+  };
+
+  const handleReassign = (onboardingId, newOfficerName) => {
+    setOnboardings(prev => prev.map(o => o.id === onboardingId ? { ...o, officer: newOfficerName } : o));
+    setReassignOnboarding(null);
+  };
+
+  const handleCancelOnboarding = (onboardingId) => {
+    setOnboardings(prev => prev.filter(o => o.id !== onboardingId));
+    setCancelOnboarding(null);
+  };
 
   const load = async () => {
     try {
@@ -612,29 +946,72 @@ export default function Applicants() {
   const displayedStages = activeFilters.length === 0 ? stages : activeFilters;
   const byStage = (stage) => filteredApplicants.filter((a) => a.status === stage);
 
+  // --- ONBOARDING FILTERING LOGIC ---
+  const filteredAndSortedOnboardings = [...onboardings]
+    .filter((o) => {
+      const matchesSearch =
+        onboardingSearchTerm === "" ||
+        `${o.employee_no} ${o.onboardee} ${o.officer}`
+          .toLowerCase()
+          .includes(onboardingSearchTerm.toLowerCase());
+
+      const isCompleted = o.steps.every(s => s.status === 'completed');
+      const matchesStatus = 
+        onboardingStatusFilter === "all" ||
+        (onboardingStatusFilter === "completed" && isCompleted) ||
+        (onboardingStatusFilter === "pending" && !isCompleted);
+
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      let aVal = a[onboardingSortConfig.key];
+      let bVal = b[onboardingSortConfig.key];
+      
+      // Handle string comparisons gracefully
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+
+      if (aVal < bVal) return onboardingSortConfig.direction === "asc" ? -1 : 1;
+      if (aVal > bVal) return onboardingSortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+
+  const SortIcon = ({ column }) => {
+    if (onboardingSortConfig.key !== column) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
+    return onboardingSortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Applicant Tracking
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {applicants.length} total applicants in pipeline
-          </p>
+      <Tabs defaultValue="applicants" className="w-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Applicant Tracking
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">
+              {applicants.length} total applicants in pipeline
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <TabsList className="grid w-full sm:w-auto grid-cols-2 bg-slate-100 p-1 rounded-xl">
+              <TabsTrigger value="applicants" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#2E6F40] data-[state=active]:shadow-sm">Applicants</TabsTrigger>
+              <TabsTrigger value="onboarding" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#2E6F40] data-[state=active]:shadow-sm">Onboarding</TabsTrigger>
+            </TabsList>
+            <Button
+              onClick={() => {
+                setEditApplicant(null);
+                setShowModal(true);
+              }}
+              className="gap-2 px-5 py-2.5 rounded-xl shadow-md bg-[#2E6F40] hover:bg-[#235330] text-white font-semibold transition-all hover:scale-[1.02] w-full sm:w-auto"
+            >
+              <Plus className="w-4 h-4" /> Add Applicant
+            </Button>
+          </div>
         </div>
-        <Button
-          onClick={() => {
-            setEditApplicant(null);
-            setShowModal(true);
-          }}
-          className="gap-2 px-5 py-2.5 rounded-xl shadow-md bg-[#2E6F40] hover:bg-[#235330] text-white font-semibold transition-all hover:scale-[1.02] w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4" /> Add Applicant
-        </Button>
-      </div>
 
-      {/* --- SEARCH AND FILTER CONTROLS --- */}
+        <TabsContent value="applicants" className="space-y-6 mt-0 border-0 p-0 outline-none">
+          {/* --- SEARCH AND FILTER CONTROLS --- */}
       <div className="flex flex-col lg:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div className="relative w-full lg:w-96 shrink-0">
           <svg
@@ -852,6 +1229,102 @@ export default function Applicants() {
           ))}
         </div>
       )}
+      </TabsContent>
+
+      <TabsContent value="onboarding" className="space-y-6 mt-0 border-0 p-0 outline-none">
+        <div className="flex flex-col lg:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="relative w-full lg:w-96 shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Search onboardee, officer, emp no..."
+              className="pl-10 w-full rounded-xl border-slate-200 focus-visible:ring-[#2E6F40] shadow-sm transition-all"
+              value={onboardingSearchTerm}
+              onChange={(e) => setOnboardingSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <Filter className="h-5 w-5 text-slate-400 hidden lg:block" />
+            <select
+              className="w-full lg:w-48 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white shadow-sm font-semibold text-slate-700"
+              value={onboardingStatusFilter}
+              onChange={(e) => setOnboardingStatusFilter(e.target.value)}
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending">Incomplete Onboarding</option>
+              <option value="completed">Completed Onboarding</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                <tr>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleOnboardingSort('employee_no')}>
+                    <div className="flex items-center">Employee No. <SortIcon column="employee_no" /></div>
+                  </th>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleOnboardingSort('onboardee')}>
+                    <div className="flex items-center">Onboardee <SortIcon column="onboardee" /></div>
+                  </th>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleOnboardingSort('start_date')}>
+                    <div className="flex items-center">Onboarding Start <SortIcon column="start_date" /></div>
+                  </th>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleOnboardingSort('end_date')}>
+                    <div className="flex items-center">Onboarding End <SortIcon column="end_date" /></div>
+                  </th>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleOnboardingSort('officer')}>
+                    <div className="flex items-center">Onboarding Officer <SortIcon column="officer" /></div>
+                  </th>
+                  <th className="px-6 py-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredAndSortedOnboardings.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
+                      No onboarding records found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAndSortedOnboardings.map((o) => (
+                    <tr key={o.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-slate-900">{o.employee_no}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-800">{o.onboardee}</td>
+                      <td className="px-6 py-4 text-slate-600">{o.start_date}</td>
+                      <td className="px-6 py-4 text-slate-600">{o.end_date}</td>
+                      <td className="px-6 py-4 text-slate-600">
+                        <span className="inline-flex items-center gap-2">
+                          <User className="w-4 h-4 text-slate-400" />
+                          {o.officer}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" className="h-8 text-xs font-semibold text-[#2E6F40] border-[#2E6F40]/20 bg-[#2E6F40]/5 hover:bg-[#2E6F40]/10" onClick={() => setViewOnboarding(o)}>
+                            View
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-8 text-xs font-semibold text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100" onClick={() => setPerformOnboarding(o)}>
+                            Perform
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50" title="Reassign Officer" onClick={() => setReassignOnboarding(o)}>
+                            <UserPlus className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50" title="Cancel Onboarding" onClick={() => setCancelOnboarding(o)}>
+                            <XCircle className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </TabsContent>
 
       {showModal && (
         <ApplicantModal
@@ -1119,6 +1592,21 @@ export default function Applicants() {
           </div>
         </div>
       )}
+
+      {/* --- ONBOARDING MODALS --- */}
+      {viewOnboarding && (
+        <ViewOnboardingModal onboarding={viewOnboarding} onClose={() => setViewOnboarding(null)} />
+      )}
+      {performOnboarding && (
+        <PerformOnboardingModal onboarding={performOnboarding} onClose={() => setPerformOnboarding(null)} onUpdateStep={handleUpdateStep} onAddStep={handleAddStep} />
+      )}
+      {reassignOnboarding && (
+        <ReassignOfficerModal onboarding={reassignOnboarding} employees={employees} onClose={() => setReassignOnboarding(null)} onConfirm={handleReassign} />
+      )}
+      {cancelOnboarding && (
+        <CancelOnboardingModal onboarding={cancelOnboarding} onClose={() => setCancelOnboarding(null)} onConfirm={handleCancelOnboarding} />
+      )}
+      </Tabs>
     </div>
   );
 }

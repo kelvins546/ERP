@@ -4,6 +4,7 @@ import { supabase } from "@/api/base44Client";
 import { Plus, X, DollarSign, User, Briefcase, FileText, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import emailjs from "@emailjs/browser";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,8 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
     status: offer?.status || "pending",
     notes: offer?.notes || "",
   });
+  const [additionalMessage, setAdditionalMessage] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -94,12 +97,42 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
     }
   };
 
+  const handleSendEmail = async () => {
+    if (!offer || !offer.applicants?.email) return alert("Applicant has no email address.");
+    setSendingEmail(true);
+    try {
+      const templateParams = {
+        applicant_name: `${offer.applicants.first_name} ${offer.applicants.last_name}`,
+        to_email: offer.applicants.email,
+        position_title: offer.position_title || offer.applicants?.job_postings?.post_title || "the position",
+        offered_salary: offer.offered_salary,
+        start_date: offer.start_date,
+        additional_message: additionalMessage,
+      };
+
+      await emailjs.send(
+        import.meta.env.VITE_EMAILJS_SERVICE_ID_OFFER || "service_6gfuxme",
+        import.meta.env.VITE_EMAILJS_TEMPLATE_ID_OFFER || "template_fwm5tau", // You'll need to set up a new template id here
+        templateParams,
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY_NEW || "fAh7fSwX2e7yd9FNx"
+      );
+      alert("Offer email sent successfully!");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to send email: " + (e.message || e.text || "Unknown error"));
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const isReadOnly = !!offer;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50">
           <h2 className="text-xl font-bold text-slate-800">
-            {offer ? "Edit Offer" : "Draft Job Offer"}
+            {offer ? "Offer Details" : "Draft Job Offer"}
           </h2>
           <button
             onClick={onClose}
@@ -115,9 +148,10 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
               Applicant *
             </label>
             <select
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white disabled:bg-slate-50 disabled:text-slate-500"
               value={form.applicant_id}
               onChange={handleApplicantChange}
+              disabled={isReadOnly}
             >
               <option value="" disabled>
                 Select an applicant...
@@ -136,9 +170,11 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
                 </option>
               ))}
             </select>
-            <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
-              Only applicants in the "Offered" stage appear here.
-            </p>
+            {!isReadOnly && (
+              <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
+                Only applicants in the "Offered" stage appear here.
+              </p>
+            )}
           </div>
 
           <div>
@@ -146,10 +182,11 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
               Official Position Title
             </label>
             <Input
-              className="rounded-xl focus-visible:ring-[#2E6F40]"
+              className="rounded-xl focus-visible:ring-[#2E6F40] disabled:bg-slate-50 disabled:text-slate-500 disabled:opacity-100"
               value={form.position_title}
               onChange={(e) => set("position_title", e.target.value)}
               placeholder="e.g. Senior React Developer"
+              disabled={isReadOnly}
             />
           </div>
 
@@ -163,13 +200,14 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
                   ₱
                 </span>
                 <Input
-                  className="pl-7 rounded-xl focus-visible:ring-[#2E6F40]"
+                  className="pl-7 rounded-xl focus-visible:ring-[#2E6F40] disabled:bg-slate-50 disabled:text-slate-500 disabled:opacity-100"
                   type="number"
                   min="0"
                   value={form.offered_salary || ""}
                   onChange={(e) =>
                     set("offered_salary", Number(e.target.value))
                   }
+                  disabled={isReadOnly}
                 />
               </div>
             </div>
@@ -178,9 +216,10 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
                 Payment Type
               </label>
               <select
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white disabled:bg-slate-50 disabled:text-slate-500"
                 value={form.payment_type}
                 onChange={(e) => set("payment_type", e.target.value)}
+                disabled={isReadOnly}
               >
                 <option value="weekly">Weekly</option>
                 <option value="bi-weekly">Bi-weekly</option>
@@ -197,10 +236,11 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
                 Target Start Date
               </label>
               <Input
-                className="rounded-xl focus-visible:ring-[#2E6F40]"
+                className="rounded-xl focus-visible:ring-[#2E6F40] disabled:bg-slate-50 disabled:text-slate-500 disabled:opacity-100"
                 type="date"
                 value={form.start_date || ""}
                 onChange={(e) => set("start_date", e.target.value)}
+                disabled={isReadOnly}
               />
             </div>
             <div>
@@ -208,9 +248,10 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
                 Offer Status
               </label>
               <select
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white disabled:bg-slate-50 disabled:text-slate-500"
                 value={form.status}
                 onChange={(e) => set("status", e.target.value)}
+                disabled={isReadOnly}
               >
                 {["pending", "accepted", "declined", "withdrawn"].map((s) => (
                   <option key={s} value={s}>
@@ -221,18 +262,20 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 block">
-              Internal Notes
-            </label>
-            <textarea
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all"
-              rows={3}
-              value={form.notes}
-              onChange={(e) => set("notes", e.target.value)}
-              placeholder="e.g. Negotiated up from 45k, waiting for signed contract..."
-            />
-          </div>
+          {isReadOnly && (
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 block">
+                Additional Message to Email
+              </label>
+              <textarea
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all"
+                rows={3}
+                value={additionalMessage}
+                onChange={(e) => setAdditionalMessage(e.target.value)}
+                placeholder="Message to include in the email offer..."
+              />
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-3 p-6 border-t border-slate-100 bg-slate-50">
           <Button
@@ -240,15 +283,25 @@ function OfferModal({ offer, applicants, onClose, onSaved }) {
             onClick={onClose}
             className="rounded-xl px-6"
           >
-            Cancel
+            {isReadOnly ? "Close" : "Cancel"}
           </Button>
-          <Button
-            className="rounded-xl px-6 bg-[#2E6F40] hover:bg-[#235330] text-white shadow-md"
-            onClick={save}
-            disabled={saving || !form.applicant_id || !form.offered_salary}
-          >
-            {saving ? "Saving..." : "Save Offer"}
-          </Button>
+          {!isReadOnly ? (
+            <Button
+              className="rounded-xl px-6 bg-[#2E6F40] hover:bg-[#235330] text-white shadow-md"
+              onClick={save}
+              disabled={saving || !form.applicant_id || !form.offered_salary}
+            >
+              {saving ? "Saving..." : "Save Offer"}
+            </Button>
+          ) : (
+            <Button
+              className="rounded-xl px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+              onClick={handleSendEmail}
+              disabled={sendingEmail}
+            >
+              {sendingEmail ? "Sending Email..." : "Send Offer Email"}
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -278,7 +331,7 @@ export default function JobOffers() {
         supabase
           .from("job_offers")
           .select(
-            "*, applicants!inner(first_name, last_name, payment_type, status, job_postings(title, post_title))",
+            "*, applicants!inner(first_name, last_name, email, phone, payment_type, status, job_postings(title, post_title))",
           )
           .eq("applicants.status", "offered")
           .order("created_at", { ascending: false })
@@ -502,6 +555,25 @@ export default function JobOffers() {
                     if (actionModal.type === "hire") {
                       await supabase.from("job_offers").update({ status: "accepted" }).eq("id", actionModal.offer.id);
                       await supabase.from("applicants").update({ status: "hired" }).eq("id", actionModal.offer.applicant_id);
+
+                      // Create the employee record
+                      const newEmployee = {
+                        employee_code: `EMP-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+                        first_name: actionModal.offer.applicants?.first_name || "New",
+                        last_name: actionModal.offer.applicants?.last_name || "Employee",
+                        email: actionModal.offer.applicants?.email || null,
+                        phone: actionModal.offer.applicants?.phone || null,
+                        status: "probationary",
+                        hire_date: actionModal.offer.start_date || new Date().toISOString().split('T')[0],
+                        position_names: actionModal.offer.position_title || actionModal.offer.applicants?.job_postings?.title || null,
+                      };
+
+                      const { error: empError } = await supabase.from("employees").insert([newEmployee]);
+                      if (empError) {
+                        console.error("Failed to create employee:", empError);
+                        alert("Applicant hired, but failed to create Employee record: " + (empError.message || "Unknown Error"));
+                      }
+
                       navigate("/applicants");
                     } else {
                       await supabase.from("job_offers").update({ status: "declined" }).eq("id", actionModal.offer.id);

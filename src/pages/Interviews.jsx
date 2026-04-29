@@ -4,6 +4,7 @@ import { supabase } from "@/api/base44Client";
 import { Plus, X, Calendar, User, Briefcase, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import emailjs from "@emailjs/browser";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,9 +52,16 @@ function InterviewModal({
   });
 
   const [saving, setSaving] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const handleSaveClick = () => {
+    if (!form.applicant_id || !form.interview_date || !form.interview_time) return;
+    setShowConfirm(true);
+  };
+
   const save = async () => {
+    setShowConfirm(false);
     setSaving(true);
     try {
       const scheduledIso = new Date(
@@ -87,6 +95,33 @@ function InterviewModal({
           if (appError) console.error("Failed to update applicant status:", appError);
         }
       }
+
+      // SEND EMAIL
+      let selectedApp = applicants.find(a => a.id === form.applicant_id);
+      if (!selectedApp && interview?.applicant_id === form.applicant_id) {
+        selectedApp = interview.applicants;
+      }
+
+      if (selectedApp && selectedApp.email) {
+        try {
+          await emailjs.send(
+            import.meta.env.VITE_EMAILJS_SERVICE_ID_NEW || "service_6gfuxme",
+            import.meta.env.VITE_EMAILJS_TEMPLATE_ID_NEW || "template_fwm5tau",
+            {
+              applicant_name: `${selectedApp.first_name} ${selectedApp.last_name}`,
+              applicant_email: selectedApp.email,
+              to_email: selectedApp.email,
+              interview_date: form.interview_date,
+              interview_time: form.interview_time,
+            },
+            import.meta.env.VITE_EMAILJS_PUBLIC_KEY_NEW || "fAh7fSwX2e7yd9FNx"
+          );
+        } catch (emailErr) {
+          console.error("Failed to send email", emailErr);
+          alert("Interview saved, but failed to send email: " + (emailErr.message || emailErr.text));
+        }
+      }
+
       onSaved();
     } catch (error) {
       console.error("Error saving interview:", error.message);
@@ -246,7 +281,7 @@ function InterviewModal({
           </Button>
           <Button
             className="rounded-xl px-6 bg-[#2E6F40] hover:bg-[#235330] text-white shadow-md"
-            onClick={save}
+            onClick={handleSaveClick}
             disabled={
               saving ||
               !form.applicant_id ||
@@ -254,10 +289,35 @@ function InterviewModal({
               !form.interview_time
             }
           >
-            {saving ? "Saving..." : "Save Interview"}
+            {saving ? "Saving..." : "Set up Appointment & Email"}
           </Button>
         </div>
       </div>
+
+      {showConfirm && (
+        <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Confirm Appointment & Email
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to save this appointment? An email invitation will be sent to the applicant.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={saving}
+                className="bg-[#2E6F40] hover:bg-[#235330] text-white"
+                onClick={save}
+              >
+                Confirm
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
@@ -288,7 +348,7 @@ export default function Interviews() {
           .select(
             `
             *,
-            applicants(first_name, last_name, status, job_postings(title, post_title)),
+            applicants(first_name, last_name, email, status, job_postings(title, post_title)),
             employees(first_name, last_name)
           `,
           )
@@ -298,7 +358,7 @@ export default function Interviews() {
         // 2. Fetch Applicants who are strictly in the 'applied' stage
         supabase
           .from("applicants")
-          .select("id, first_name, last_name, job_postings(title, post_title)")
+          .select("id, first_name, last_name, email, job_postings(title, post_title)")
           .eq("status", "applied"),
 
         // 3. Fetch Employees to act as interviewers
@@ -466,7 +526,7 @@ export default function Interviews() {
                         onClick={(e) => { e.stopPropagation(); setActionModal({ type: "pass", interview: i }); }}
                         className="flex-1 font-bold text-[#2E6F40] bg-[#2E6F40]/10 hover:bg-[#2E6F40]/20 border-transparent shadow-none"
                       >
-                        Pass
+                        Set up Offer
                       </Button>
                       <Button
                         size="sm"

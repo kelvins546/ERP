@@ -220,7 +220,7 @@ export default function Employees() {
     if (multiple.length > 0) return multiple;
 
     const singleTitle =
-      positionsById[emp.position_id]?.title || emp.position_name || null;
+      positionsById[emp.position_id]?.title || emp.position_names || emp.position_name || null;
     return singleTitle ? [singleTitle] : [];
   };
 

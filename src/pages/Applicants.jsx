@@ -798,7 +798,85 @@ function CancelOnboardingModal({ onboarding, onClose, onConfirm }) {
 }
 
 // --- THE MAIN PAGE (READ & KANBAN LOGIC) ---
+
+function SetupOnboardingModal({ applicants, employees, onClose, onSave }) {
+  const [applicantId, setApplicantId] = useState("");
+  const [officerId, setOfficerId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const save = () => {
+    if (!applicantId || !officerId || !startDate || !endDate) return alert("Please fill all fields");
+    const app = applicants.find(a => a.id === applicantId);
+    const emp = employees.find(e => e.id === officerId);
+    if (!app || !emp) return;
+
+    onSave({
+      id: Date.now(),
+      employee_no: `EMP-${new Date().getFullYear()}-${Math.floor(Math.random()*1000).toString().padStart(3,'0')}`,
+      onboardee: `${app.first_name} ${app.last_name}`,
+      start_date: startDate,
+      end_date: endDate,
+      officer: `${emp.first_name} ${emp.last_name}`,
+      steps: [
+        { id: 1, name: "Employee profile", status: "pending" },
+        { id: 2, name: "Job contract", status: "pending" },
+        { id: 3, name: "Discuss company policy", status: "pending" },
+        { id: 4, name: "Set Employee schedule", status: "pending" },
+        { id: 5, name: "Setup statutory forms", status: "pending" },
+        { id: 6, name: "Setup benefits and deductions", status: "pending" }
+      ]
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+        <h3 className="text-xl font-bold text-slate-900 mb-6">Set up new onboarding</h3>
+        <div className="space-y-4 text-left mb-8">
+          <div>
+            <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">Select Applicant</label>
+            <select className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white" value={applicantId} onChange={e => setApplicantId(e.target.value)}>
+              <option value="">Select...</option>
+              {applicants.map(app => (
+                <option key={app.id} value={app.id}>{app.first_name} {app.last_name} ({app.status})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">Onboarding Officer</label>
+            <select className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#2E6F40] focus:ring-1 focus:ring-[#2E6F40] transition-all bg-white" value={officerId} onChange={e => setOfficerId(e.target.value)}>
+              <option value="">Select...</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">Start Date</label>
+              <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block mb-1.5">End Date</label>
+              <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-3 justify-end">
+          <Button variant="outline" className="rounded-xl px-6" onClick={onClose}>Cancel</Button>
+          <Button className="rounded-xl px-6 bg-[#2E6F40] hover:bg-[#235330] text-white shadow-md" onClick={save}>
+            Set up Onboarding
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Applicants() {
+  const [activeTab, setActiveTab] = useState("applicants");
+  const [showSetupOnboarding, setShowSetupOnboarding] = useState(false);
   const [applicants, setApplicants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -1605,6 +1683,17 @@ export default function Applicants() {
       )}
       {cancelOnboarding && (
         <CancelOnboardingModal onboarding={cancelOnboarding} onClose={() => setCancelOnboarding(null)} onConfirm={handleCancelOnboarding} />
+      )}
+      {showSetupOnboarding && (
+        <SetupOnboardingModal
+          applicants={applicants}
+          employees={employees}
+          onClose={() => setShowSetupOnboarding(false)}
+          onSave={(newOnboarding) => {
+            setOnboardings(prev => [newOnboarding, ...prev]);
+            setShowSetupOnboarding(false);
+          }}
+        />
       )}
       </Tabs>
     </div>
